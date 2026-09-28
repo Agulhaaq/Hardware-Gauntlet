@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Hardware Gauntlet - macOS Native App Executable Entrypoint
+
+DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+
+if [ -f "$DIR/dist/hwscan-macos-universal" ]; then
+    exec "$DIR/dist/hwscan-macos-universal" --gui "$@"
+elif command -v python3 >/dev/null 2>&1; then
+    exec python3 -m hwscan --gui "$@"
+else
+    osascript -e 'display alert "Hardware Gauntlet" message "Python 3 or standalone macOS binary was not found in the project folder."'
+fi

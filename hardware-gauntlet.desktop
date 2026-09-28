@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Hardware Gauntlet
+GenericName=Hardware Diagnostic Suite
+Comment=Universal Cross-Platform Hardware Scanner & Diagnostic Suite
+Exec=python3 -m hwscan --gui
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Monitor;HardwareSettings;
+Keywords=hardware;diagnostic;cpu;gpu;ram;disk;scanner;
+StartupNotify=true

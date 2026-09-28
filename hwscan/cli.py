@@ -1,4 +1,4 @@
-"""Command Line Interface for Hardware Gauntlet."""
+"""Command Line and GUI Interface for Hardware Gauntlet."""
 
 import sys
 import argparse
@@ -20,6 +20,20 @@ def main():
         "-v", "--version",
         action="version",
         version=f"{__app_name__} v{__version__}"
+    )
+
+    parser.add_argument(
+        "--gui",
+        nargs="?",
+        const="auto",
+        choices=["auto", "webview", "tk"],
+        help="Launch native desktop GUI application window (default when double-clicked)"
+    )
+
+    parser.add_argument(
+        "--cli",
+        action="store_true",
+        help="Force terminal console output instead of GUI desktop window"
     )
 
     parser.add_argument(
@@ -86,6 +100,18 @@ def main():
         start_server(host=args.host, port=args.port)
         return
 
+    # Desktop GUI Mode:
+    # Triggered if --gui is provided, OR if no arguments are passed and stdin is not a pipe/redirect
+    should_launch_gui = bool(args.gui)
+    if len(sys.argv) == 1 and not args.cli:
+        should_launch_gui = True
+
+    if should_launch_gui and not (args.cli or args.json or args.html or args.markdown or args.health or args.full):
+        from hwscan.gui import launch_gui
+        engine_choice = args.gui if args.gui in ("auto", "webview", "tk") else "auto"
+        launch_gui(prefer_engine=engine_choice)
+        return
+
     # Execute Hardware Scan
     engine = HardwareScannerEngine()
     report = engine.run_full_scan()
@@ -120,8 +146,8 @@ def main():
         print(f"[✓] Markdown report generated: {args.markdown}")
         handled_output = True
 
-    # Default to console rendering if no specific output file was requested, or if stdout wasn't already consumed
-    if not handled_output or (args.html and not args.json) or (args.markdown and not args.json):
+    # Terminal rendering
+    if not handled_output or (args.html and not args.json) or (args.markdown and not args.json) or args.cli or args.full:
         reporter = ConsoleReporter()
         reporter.render(report, full=args.full)
 
