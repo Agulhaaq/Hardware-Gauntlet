@@ -14,7 +14,7 @@ Write-Host "==========================================================" -Foregro
 
 $InstallDir = "$env:LOCALAPPDATA\HardwareGauntlet"
 $BinPath = "$InstallDir\hwscan.exe"
-$RepoUrl = "https://github.com/agulh/Hardware-Gauntlet"
+$RepoUrl = "https://github.com/Agulhaaq/Hardware-Gauntlet"
 
 # 1. Check if Python is available
 if (Get-Command python -ErrorAction SilentlyContinue) {

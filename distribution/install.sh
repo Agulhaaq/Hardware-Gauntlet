@@ -11,7 +11,7 @@ echo "=========================================================="
 OS="$(uname -s)"
 ARCH="$(uname -m)"
 INSTALL_DIR="$HOME/.local/bin"
-REPO_URL="https://github.com/agulh/Hardware-Gauntlet"
+REPO_URL="https://github.com/Agulhaaq/Hardware-Gauntlet"
 
 mkdir -p "$INSTALL_DIR"
 

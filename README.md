@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-brightgreen.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
-[![Build & Release](https://github.com/agulh/Hardware-Gauntlet/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/agulh/Hardware-Gauntlet/actions)
+[![Build & Release](https://github.com/Agulhaaq/Hardware-Gauntlet/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/Agulhaaq/Hardware-Gauntlet/actions)
 
 Hardware Gauntlet is a high-performance system hardware audit and diagnostic suite that extracts deep hardware telemetry across every major desktop, laptop, and server platform without external dependencies.
 
@@ -17,17 +17,17 @@ Run directly in your terminal without manual cloning or configuration:
 
 ### 🪟 Windows (PowerShell)
 ```powershell
-irm https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.ps1 | iex
+irm https://raw.githubusercontent.com/Agulhaaq/Hardware-Gauntlet/main/distribution/install.ps1 | iex
 ```
 
 ### 🍎 macOS (Apple Silicon & Intel)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Agulhaaq/Hardware-Gauntlet/main/distribution/install.sh | bash
 ```
 
 ### 🐧 Linux (Ubuntu, Debian, Fedora, Arch, RHEL)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Agulhaaq/Hardware-Gauntlet/main/distribution/install.sh | bash
 ```
 
 ### 🐍 Standard Python / Pip

@@ -28,5 +28,5 @@ dependencies = [
 hwscan = "hwscan.cli:main"
 
 [project.urls]
-"Homepage" = "https://github.com/agulh/Hardware-Gauntlet"
-"Bug Tracker" = "https://github.com/agulh/Hardware-Gauntlet/issues"
+"Homepage" = "https://github.com/Agulhaaq/Hardware-Gauntlet"
+"Bug Tracker" = "https://github.com/Agulhaaq/Hardware-Gauntlet/issues"
