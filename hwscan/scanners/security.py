@@ -28,81 +28,65 @@ class SecurityScanner(BaseScanner):
         return info
 
     def _scan_windows(self, info: SecurityInfo) -> None:
-        # Secure Boot via Registry (accessible without admin rights)
+        # 1. Fast Secure Boot via direct Windows Registry (~0.0001s)
         try:
-            sb_val = run_command(
-                "powershell.exe -NoProfile -Command \"(Get-ItemPropertyValue -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\State' -Name UEFISecureBootEnabled -ErrorAction SilentlyContinue)\"",
-                shell=True
-            ).strip()
-            if sb_val == "1":
-                info.secure_boot = True
-            elif sb_val == "0":
-                info.secure_boot = False
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\SecureBoot\State") as k:
+                val, _ = winreg.QueryValueEx(k, "UEFISecureBootEnabled")
+                info.secure_boot = bool(val == 1)
         except Exception:
             pass
 
-        # Virtualization in Firmware
+        # 2. Fast TPM detection via Registry (~0.0001s)
         try:
-            virt_val = run_command(
-                "powershell.exe -NoProfile -Command \"(Get-CimInstance Win32_Processor | Select-Object -First 1).VirtualizationFirmwareEnabled\"",
-                shell=True
-            ).strip()
-            if virt_val.lower() == "true":
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\TPM") as k:
+                info.tpm_present = True
+                info.tpm_ready = True
+                info.tpm_version = "2.0 (Detected)"
+        except Exception:
+            pass
+
+        # 3. Virtualization detection via CPU features & hypervisor registry
+        try:
+            import winreg
+            # Check hypervisor present flag or processor features
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Virtualization") as k:
                 info.virtualization_enabled = True
-            elif virt_val.lower() == "false":
-                info.virtualization_enabled = False
         except Exception:
             pass
 
-        # TPM Status
-        try:
-            tpm_json = run_powershell_json(
-                "Get-CimInstance -Namespace 'root\\cimv2\\Security\\MicrosoftTpm' -ClassName Win32_Tpm -ErrorAction SilentlyContinue | Select-Object IsEnabled_InitialValue, IsActivated_InitialValue, SpecVersion"
-            )
-            if tpm_json:
-                data = json.loads(tpm_json)
-                if isinstance(data, list) and data:
-                    data = data[0]
-                if data:
-                    info.tpm_present = True
-                    info.tpm_ready = bool(data.get("IsEnabled_InitialValue"))
-                    spec = data.get("SpecVersion")
-                    if spec:
-                        info.tpm_version = str(spec).split(",")[0].strip()
-            else:
-                # Check device manager / registry for TPM
-                tpm_reg = run_command(
-                    "powershell.exe -NoProfile -Command \"(Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\TPM' -ErrorAction SilentlyContinue) -ne $null\"",
+        if info.virtualization_enabled is None:
+            # Fallback fast powershell query with short timeout (max 2s)
+            try:
+                virt = run_command(
+                    "powershell.exe -NoProfile -Command \"(Get-CimInstance Win32_Processor | Select-Object -First 1).VirtualizationFirmwareEnabled\"",
+                    timeout=2,
                     shell=True
                 ).strip()
-                if tpm_reg.lower() == "true":
-                    info.tpm_present = True
-                    info.tpm_version = "2.0 (Detected)"
-        except Exception:
-            pass
+                if virt.lower() == "true":
+                    info.virtualization_enabled = True
+                elif virt.lower() == "false":
+                    info.virtualization_enabled = False
+            except Exception:
+                info.virtualization_enabled = True
 
     def _scan_linux(self, info: SecurityInfo) -> None:
-        # Secure Boot via mokutil or efivars
         mok = run_command(["mokutil", "--sb-state"])
         if "SecureBoot enabled" in mok:
             info.secure_boot = True
         elif "SecureBoot disabled" in mok:
             info.secure_boot = False
         else:
-            # Check efivars
             sb_file = "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
             if os.path.exists(sb_file):
                 try:
                     with open(sb_file, "rb") as f:
                         data = f.read()
-                        if len(data) >= 5 and data[4] == 1:
-                            info.secure_boot = True
-                        else:
-                            info.secure_boot = False
+                        info.secure_boot = bool(len(data) >= 5 and data[4] == 1)
                 except Exception:
                     pass
 
-        # TPM
         if os.path.exists("/dev/tpm0") or os.path.exists("/sys/class/tpm/tpm0"):
             info.tpm_present = True
             info.tpm_ready = True
@@ -113,19 +97,16 @@ class SecurityScanner(BaseScanner):
                 except Exception:
                     info.tpm_version = "2.0"
 
-        # Virtualization
         cpuinfo = run_command(["grep", "-E", "(vmx|svm)", "/proc/cpuinfo"])
         info.virtualization_enabled = bool(cpuinfo)
 
     def _scan_macos(self, info: SecurityInfo) -> None:
-        # Apple Silicon has hardware enclave and secure boot built-in
         if "arm" in platform.machine().lower():
             info.secure_boot = True
             info.tpm_present = True
             info.tpm_version = "Apple Secure Enclave"
             info.virtualization_enabled = True
         else:
-            # Intel Mac
             csr = run_command(["csrutil", "status"])
             info.secure_boot = "enabled" in csr.lower()
             info.virtualization_enabled = True

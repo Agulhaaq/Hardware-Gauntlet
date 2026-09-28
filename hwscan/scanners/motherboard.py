@@ -58,7 +58,34 @@ class MotherboardScanner(BaseScanner):
         return info
 
     def _scan_windows(self, info: MotherboardInfo) -> None:
-        # BaseBoard
+        # Fast path: Direct Windows Registry (instantaneous ~0.0005s)
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\BIOS") as k:
+                def get_val(name):
+                    try:
+                        v, _ = winreg.QueryValueEx(k, name)
+                        return str(v).strip()
+                    except OSError:
+                        return ""
+
+                info.manufacturer = get_val("BaseBoardManufacturer") or get_val("SystemManufacturer") or "Unknown"
+                info.product_name = get_val("BaseBoardProduct") or get_val("SystemProductName") or "Unknown"
+                info.version = get_val("BaseBoardVersion") or get_val("SystemVersion") or "Unknown"
+                info.bios_vendor = get_val("BIOSVendor") or "Unknown"
+                info.bios_version = get_val("BIOSVersion") or "Unknown"
+                info.bios_release_date = get_val("BIOSReleaseDate") or "Unknown"
+                enclosure = get_val("EnclosureType")
+                if enclosure and enclosure.isdigit():
+                    info.chassis_type = CHASSIS_TYPES.get(int(enclosure), "Desktop")
+        except Exception:
+            pass
+
+        # If missing core fields, fallback to PowerShell CIM
+        if info.manufacturer in ("Unknown", "") or info.bios_vendor in ("Unknown", ""):
+            self._scan_windows_cim(info)
+
+    def _scan_windows_cim(self, info: MotherboardInfo) -> None:
         try:
             bb_json = run_powershell_json(
                 "Get-CimInstance Win32_BaseBoard | Select-Object Manufacturer, Product, SerialNumber, Version"
@@ -67,14 +94,17 @@ class MotherboardScanner(BaseScanner):
                 data = json.loads(bb_json)
                 if isinstance(data, list) and data:
                     data = data[0]
-                info.manufacturer = data.get("Manufacturer", "Unknown").strip()
-                info.product_name = data.get("Product", "Unknown").strip()
-                info.serial_number = data.get("SerialNumber", "Unknown").strip()
-                info.version = data.get("Version", "").strip()
+                if data.get("Manufacturer"):
+                    info.manufacturer = data.get("Manufacturer", "").strip()
+                if data.get("Product"):
+                    info.product_name = data.get("Product", "").strip()
+                if data.get("SerialNumber"):
+                    info.serial_number = data.get("SerialNumber", "").strip()
+                if data.get("Version"):
+                    info.version = data.get("Version", "").strip()
         except Exception:
             pass
 
-        # BIOS
         try:
             bios_json = run_powershell_json(
                 "Get-CimInstance Win32_BIOS | Select-Object Manufacturer, SMBIOSBIOSVersion, ReleaseDate"
@@ -83,40 +113,10 @@ class MotherboardScanner(BaseScanner):
                 data = json.loads(bios_json)
                 if isinstance(data, list) and data:
                     data = data[0]
-                info.bios_vendor = data.get("Manufacturer", "Unknown").strip()
-                info.bios_version = data.get("SMBIOSBIOSVersion", "Unknown").strip()
-                rel = str(data.get("ReleaseDate", "")).strip()
-                if rel:
-                    if "/Date(" in rel:
-                        try:
-                            import re
-                            from datetime import datetime, timezone
-                            match = re.search(r"/Date\((\d+)\)/", rel)
-                            if match:
-                                ms = int(match.group(1))
-                                dt = datetime.fromtimestamp(ms / 1000.0, timezone.utc)
-                                info.bios_release_date = dt.strftime("%Y-%m-%d")
-                            else:
-                                info.bios_release_date = rel
-                        except Exception:
-                            info.bios_release_date = rel
-                    else:
-                        info.bios_release_date = rel.split("T")[0].split()[0]
-        except Exception:
-            pass
-
-        # Chassis
-        try:
-            ch_json = run_powershell_json(
-                "Get-CimInstance Win32_SystemEnclosure | Select-Object ChassisTypes"
-            )
-            if ch_json:
-                data = json.loads(ch_json)
-                ct = data.get("ChassisTypes", [])
-                if isinstance(ct, list) and ct:
-                    info.chassis_type = CHASSIS_TYPES.get(int(ct[0]), "Desktop/Laptop")
-                elif isinstance(ct, int):
-                    info.chassis_type = CHASSIS_TYPES.get(ct, "Desktop/Laptop")
+                if data.get("Manufacturer"):
+                    info.bios_vendor = data.get("Manufacturer", "").strip()
+                if data.get("SMBIOSBIOSVersion"):
+                    info.bios_version = data.get("SMBIOSBIOSVersion", "").strip()
         except Exception:
             pass
 

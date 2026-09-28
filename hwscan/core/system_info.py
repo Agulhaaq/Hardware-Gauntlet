@@ -1,9 +1,14 @@
 """Hardware Gauntlet core scanner orchestrator and health evaluation engine."""
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple
 
-from hwscan.core.models import HardwareReport, HealthWarning
+from hwscan.core.models import (
+    HardwareReport, HealthWarning, SystemInfo, CPUInfo,
+    MemoryInfo, MotherboardInfo, GPUInfo, StorageInfo,
+    NetworkInfo, BatteryInfo, PeripheralInfo, SecurityInfo
+)
 from hwscan.scanners.system import SystemScanner
 from hwscan.scanners.cpu import CPUScanner
 from hwscan.scanners.memory import MemoryScanner
@@ -32,19 +37,31 @@ class HardwareScannerEngine:
         self.security_scanner = SecurityScanner()
 
     def run_full_scan(self) -> HardwareReport:
-        """Run all scanners, evaluate health, and return final report."""
+        """Run all scanners concurrently in parallel threads, evaluate health, and return final report."""
         t0 = time.time()
 
-        system = self.system_scanner.scan()
-        cpu = self.cpu_scanner.scan()
-        memory = self.memory_scanner.scan()
-        motherboard = self.motherboard_scanner.scan()
-        gpu = self.gpu_scanner.scan()
-        storage = self.storage_scanner.scan()
-        network = self.network_scanner.scan()
-        battery = self.battery_scanner.scan()
-        peripherals = self.peripheral_scanner.scan()
-        security = self.security_scanner.scan()
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            fut_system = executor.submit(self.system_scanner.scan)
+            fut_cpu = executor.submit(self.cpu_scanner.scan)
+            fut_memory = executor.submit(self.memory_scanner.scan)
+            fut_motherboard = executor.submit(self.motherboard_scanner.scan)
+            fut_gpu = executor.submit(self.gpu_scanner.scan)
+            fut_storage = executor.submit(self.storage_scanner.scan)
+            fut_network = executor.submit(self.network_scanner.scan)
+            fut_battery = executor.submit(self.battery_scanner.scan)
+            fut_peripherals = executor.submit(self.peripheral_scanner.scan)
+            fut_security = executor.submit(self.security_scanner.scan)
+
+            system = fut_system.result()
+            cpu = fut_cpu.result()
+            memory = fut_memory.result()
+            motherboard = fut_motherboard.result()
+            gpu = fut_gpu.result()
+            storage = fut_storage.result()
+            network = fut_network.result()
+            battery = fut_battery.result()
+            peripherals = fut_peripherals.result()
+            security = fut_security.result()
 
         health_score, warnings = self._evaluate_health(
             system, cpu, memory, storage, security, battery
@@ -104,7 +121,6 @@ class HardwareScannerEngine:
                 description=f"System RAM is at {memory.percent}% utilization."
             ))
 
-        # Check for mismatched RAM module speeds or capacities
         if len(memory.modules) > 1:
             speeds = set(m.speed_mhz for m in memory.modules if m.speed_mhz > 0)
             capacities = set(m.capacity_bytes for m in memory.modules if m.capacity_bytes > 0)

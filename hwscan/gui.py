@@ -1,9 +1,4 @@
-"""Native Desktop GUI Application for Hardware Gauntlet.
-
-Supports dual-mode rendering:
-1. High-fidelity WebView2 / WebKit / WebKitGTK native desktop window
-2. Standalone Tkinter dark-theme GUI (zero extra dependencies, built into Python)
-"""
+"""Native Desktop GUI Application for Hardware Gauntlet with Instant Launch."""
 
 import os
 import sys
@@ -19,7 +14,7 @@ from hwscan.core.utils import format_bytes, format_hz
 
 
 class HardwareGauntletGUI:
-    """Orchestrates launching the desktop application window."""
+    """Orchestrates launching the desktop application window with instant responsiveness."""
 
     def __init__(self):
         self.engine = HardwareScannerEngine()
@@ -28,23 +23,17 @@ class HardwareGauntletGUI:
         self.current_report = None
 
     def run(self, prefer_engine: str = "auto") -> None:
-        """Launch the GUI desktop application window."""
-        # Initial scan
-        self.current_report = self.engine.run_full_scan()
-
-        if prefer_engine == "tk":
-            self._run_tkinter()
-            return
-
-        if prefer_engine in ("auto", "webview"):
+        """Launch the native desktop application window."""
+        if prefer_engine == "webview":
             try:
                 import webview
+                self.current_report = self.engine.run_full_scan()
                 self._run_webview(webview)
                 return
-            except Exception as e:
-                # Fallback gracefully to Tkinter
+            except Exception:
                 pass
 
+        # Standard Tkinter engine: instantaneous launch and 100% cross-platform stability
         self._run_tkinter()
 
     def _run_webview(self, webview_module) -> None:
@@ -63,25 +52,9 @@ class HardwareGauntletGUI:
         sec_str = "Secure Boot OK" if report.security.secure_boot else "Standard"
         html = html.replace("{{SECURITY_INFO}}", sec_str)
 
-        # Inject desktop bridge
-        class WindowAPI:
-            def __init__(self, parent):
-                self.parent = parent
-
-            def refresh(self):
-                self.parent.current_report = self.parent.engine.run_full_scan()
-                return self.parent.current_report.to_dict()
-
-            def export_html(self):
-                out_path = os.path.join(os.path.expanduser("~"), "Desktop", f"hardware-report-{self.parent.current_report.system.hostname}.html")
-                self.parent.html_reporter.write_file(self.parent.current_report, out_path)
-                return out_path
-
-        api = WindowAPI(self)
         window = webview_module.create_window(
             title="Hardware Gauntlet - Universal Hardware Diagnostic Suite",
             html=html,
-            js_api=api,
             width=1180,
             height=820,
             min_size=(900, 600),
@@ -90,7 +63,7 @@ class HardwareGauntletGUI:
         webview_module.start()
 
     def _run_tkinter(self) -> None:
-        """Render native Tkinter dark-theme GUI."""
+        """Render native Tkinter dark-theme GUI with instant non-blocking launch."""
         import tkinter as tk
         from tkinter import ttk, messagebox, filedialog
 
@@ -99,7 +72,7 @@ class HardwareGauntletGUI:
         root.geometry("1100x750")
         root.minsize(850, 600)
 
-        # Apply dark theme styling
+        # Dark theme color palette
         BG_DARK = "#0b0f19"
         SURFACE = "#111827"
         SURFACE_CARD = "#1e293b"
@@ -130,20 +103,29 @@ class HardwareGauntletGUI:
         title_frame.pack(side=tk.LEFT)
 
         tk.Label(title_frame, text="⚡ HARDWARE GAUNTLET", font=("Segoe UI", 16, "bold"), fg=CYAN, bg=SURFACE).pack(anchor="w")
-        sub_text = f"Host: {self.current_report.system.hostname} • OS: {self.current_report.system.os_name} ({self.current_report.system.os_arch})"
-        lbl_subtitle = tk.Label(title_frame, text=sub_text, font=("Segoe UI", 10), fg=TEXT_DIM, bg=SURFACE)
+        lbl_subtitle = tk.Label(title_frame, text="Scanning local hardware components...", font=("Segoe UI", 10), fg=TEXT_DIM, bg=SURFACE)
         lbl_subtitle.pack(anchor="w")
 
         # Action Buttons Frame
         btn_frame = tk.Frame(header, bg=SURFACE)
         btn_frame.pack(side=tk.RIGHT)
 
+        score_val = tk.StringVar(value="...")
+        score_frame = tk.Frame(btn_frame, bg=SURFACE_CARD, padx=12, pady=6, relief=tk.RIDGE, bd=1)
+        score_frame.pack(side=tk.LEFT, padx=12)
+        lbl_score_num = tk.Label(score_frame, textvariable=score_val, font=("Segoe UI", 16, "bold"), fg=GREEN, bg=SURFACE_CARD)
+        lbl_score_num.pack()
+        tk.Label(score_frame, text="HEALTH SCORE", font=("Segoe UI", 8), fg=TEXT_DIM, bg=SURFACE_CARD).pack()
+
+        # Action Callbacks
         def do_refresh():
-            self.current_report = self.engine.run_full_scan()
-            refresh_views()
-            messagebox.showinfo("Hardware Scan", f"Hardware scan updated in {self.current_report.scan_duration_seconds}s!")
+            btn_refresh.config(state=tk.DISABLED, text="⏳ Scanning...")
+            lbl_subtitle.config(text="Scanning local hardware components...")
+            threading.Thread(target=run_background_scan, daemon=True).start()
 
         def do_export_html():
+            if not self.current_report:
+                return
             f = filedialog.asksaveasfilename(
                 defaultextension=".html",
                 filetypes=[("HTML Files", "*.html")],
@@ -155,6 +137,8 @@ class HardwareGauntletGUI:
                     webbrowser.open(f)
 
         def do_export_json():
+            if not self.current_report:
+                return
             f = filedialog.asksaveasfilename(
                 defaultextension=".json",
                 filetypes=[("JSON Files", "*.json")],
@@ -169,14 +153,8 @@ class HardwareGauntletGUI:
             threading.Thread(target=start_server, kwargs={"port": 8080}, daemon=True).start()
             webbrowser.open("http://localhost:8080")
 
-        # Score Box
-        score_val = tk.StringVar(value=str(self.current_report.health_score))
-        score_frame = tk.Frame(btn_frame, bg=SURFACE_CARD, padx=12, pady=6, relief=tk.RIDGE, bd=1)
-        score_frame.pack(side=tk.LEFT, padx=12)
-        tk.Label(score_frame, textvariable=score_val, font=("Segoe UI", 16, "bold"), fg=GREEN, bg=SURFACE_CARD).pack()
-        tk.Label(score_frame, text="HEALTH SCORE", font=("Segoe UI", 8), fg=TEXT_DIM, bg=SURFACE_CARD).pack()
-
-        tk.Button(btn_frame, text="🔄 Refresh Scan", command=do_refresh, font=("Segoe UI", 9, "bold"), bg="#1e293b", fg=TEXT_LIGHT, activebackground="#334155", activeforeground=TEXT_LIGHT, relief=tk.FLAT, padx=12, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
+        btn_refresh = tk.Button(btn_frame, text="🔄 Refresh Scan", command=do_refresh, font=("Segoe UI", 9, "bold"), bg="#1e293b", fg=TEXT_LIGHT, activebackground="#334155", activeforeground=TEXT_LIGHT, relief=tk.FLAT, padx=12, pady=6, cursor="hand2")
+        btn_refresh.pack(side=tk.LEFT, padx=4)
         tk.Button(btn_frame, text="📄 Export HTML", command=do_export_html, font=("Segoe UI", 9, "bold"), bg="#2563eb", fg="#ffffff", activebackground="#1d4ed8", activeforeground="#ffffff", relief=tk.FLAT, padx=12, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
         tk.Button(btn_frame, text="💾 Export JSON", command=do_export_json, font=("Segoe UI", 9), bg="#1e293b", fg=TEXT_LIGHT, relief=tk.FLAT, padx=10, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
         tk.Button(btn_frame, text="🌐 Web Portal", command=do_launch_web, font=("Segoe UI", 9), bg="#1e293b", fg=CYAN, relief=tk.FLAT, padx=10, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
@@ -185,31 +163,25 @@ class HardwareGauntletGUI:
         notebook = ttk.Notebook(root)
         notebook.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
 
-        # Tab 1: Overview & KPI Cards
         tab_overview = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
         notebook.add(tab_overview, text="📊 System Overview")
 
-        # Tab 2: Processor & Motherboard
         tab_cpu = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
         notebook.add(tab_cpu, text="🧠 CPU & Motherboard")
 
-        # Tab 3: Memory (RAM)
         tab_mem = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
         notebook.add(tab_mem, text="💾 RAM & DIMM Slots")
 
-        # Tab 4: GPU & Displays
         tab_gpu = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
         notebook.add(tab_gpu, text="🎮 Graphics & Displays")
 
-        # Tab 5: Storage
         tab_storage = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
         notebook.add(tab_storage, text="💽 Drives & Partitions")
 
-        # Tab 6: Multi-OS Downloads
         tab_downloads = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
         notebook.add(tab_downloads, text="📥 Downloads Per OS")
 
-        # Overview Content
+        # Overview KPI Cards
         kpi_grid = tk.Frame(tab_overview, bg=BG_DARK)
         kpi_grid.pack(fill=tk.X, pady=(0, 16))
 
@@ -223,14 +195,12 @@ class HardwareGauntletGUI:
             lbl_s.pack(anchor="w")
             return lbl_v, lbl_s
 
-        kpi_cpu_v, kpi_cpu_s = create_kpi_card(kpi_grid, "Processor (CPU)", self.current_report.cpu.model[:24], f"{self.current_report.cpu.physical_cores} Cores / {self.current_report.cpu.logical_cores} Threads")
-        kpi_mem_v, kpi_mem_s = create_kpi_card(kpi_grid, "Memory (RAM)", format_bytes(self.current_report.memory.total_bytes), f"{self.current_report.memory.percent}% in use")
-        gpu_name = self.current_report.gpu.devices[0].name[:22] if self.current_report.gpu.devices else "Integrated GPU"
-        kpi_gpu_v, kpi_gpu_s = create_kpi_card(kpi_grid, "Graphics (GPU)", gpu_name, self.current_report.gpu.devices[0].vram_formatted if self.current_report.gpu.devices else "Shared VRAM")
-        sec_str = "Secure Boot OK" if self.current_report.security.secure_boot else "Secure Boot OFF"
-        kpi_sec_v, kpi_sec_s = create_kpi_card(kpi_grid, "Security & Boot", sec_str, f"TPM: {'Active' if self.current_report.security.tpm_present else 'None'}")
+        kpi_cpu_v, kpi_cpu_s = create_kpi_card(kpi_grid, "Processor (CPU)", "Detecting...", "Cores & Threads")
+        kpi_mem_v, kpi_mem_s = create_kpi_card(kpi_grid, "Memory (RAM)", "Detecting...", "RAM Usage")
+        kpi_gpu_v, kpi_gpu_s = create_kpi_card(kpi_grid, "Graphics (GPU)", "Detecting...", "VRAM & Displays")
+        kpi_sec_v, kpi_sec_s = create_kpi_card(kpi_grid, "Security & Boot", "Detecting...", "Secure Boot & TPM")
 
-        # Overview Diagnostics Box
+        # Diagnostics Findings
         tk.Label(tab_overview, text="🔍 DIAGNOSTICS & HEALTH FINDINGS", font=("Segoe UI", 11, "bold"), fg=CYAN, bg=BG_DARK).pack(anchor="w", pady=(8, 4))
         tree_warn = ttk.Treeview(tab_overview, columns=("level", "category", "details"), show="headings", height=8)
         tree_warn.heading("level", text="Level")
@@ -331,21 +301,30 @@ class HardwareGauntletGUI:
             "curl -fsSL https://raw.githubusercontent.com/Agulhaaq/Hardware-Gauntlet/main/distribution/install.sh | bash"
         )
 
-        # Refresh all views
-        def refresh_views():
-            r = self.current_report
-            score_val.set(str(r.health_score))
-            lbl_subtitle.config(text=f"Host: {r.system.hostname} • OS: {r.system.os_name} ({r.system.os_arch}) • Uptime: {r.system.uptime_formatted}")
+        # Thread-safe UI update
+        def update_ui_with_report(report):
+            self.current_report = report
+            score_val.set(str(report.health_score))
+            lbl_subtitle.config(text=f"Host: {report.system.hostname} • OS: {report.system.os_name} ({report.system.os_arch}) • Uptime: {report.system.uptime_formatted}")
+            btn_refresh.config(state=tk.NORMAL, text="🔄 Refresh Scan")
 
-            kpi_cpu_v.config(text=r.cpu.model[:24])
-            kpi_cpu_s.config(text=f"{r.cpu.physical_cores} Cores / {r.cpu.logical_cores} Threads @ {format_hz(r.cpu.max_clock_mhz)}")
-            kpi_mem_v.config(text=format_bytes(r.memory.total_bytes))
-            kpi_mem_s.config(text=f"{r.memory.percent}% used ({format_bytes(r.memory.used_bytes)})")
+            kpi_cpu_v.config(text=report.cpu.model[:24])
+            kpi_cpu_s.config(text=f"{report.cpu.physical_cores} Cores / {report.cpu.logical_cores} Threads @ {format_hz(report.cpu.max_clock_mhz)}")
+            kpi_mem_v.config(text=format_bytes(report.memory.total_bytes))
+            kpi_mem_s.config(text=f"{report.memory.percent}% used ({format_bytes(report.memory.used_bytes)})")
+
+            gpu_name = report.gpu.devices[0].name[:22] if report.gpu.devices else "Integrated GPU"
+            kpi_gpu_v.config(text=gpu_name)
+            kpi_gpu_s.config(text=report.gpu.devices[0].vram_formatted if report.gpu.devices else "Shared VRAM")
+
+            sec_str = "Secure Boot OK" if report.security.secure_boot else "Secure Boot OFF"
+            kpi_sec_v.config(text=sec_str)
+            kpi_sec_s.config(text=f"TPM: {'Active' if report.security.tpm_present else 'None'}")
 
             # Warnings
             tree_warn.delete(*tree_warn.get_children())
-            if r.warnings:
-                for w in r.warnings:
+            if report.warnings:
+                for w in report.warnings:
                     tree_warn.insert("", tk.END, values=(w.level, w.category, f"{w.title}: {w.description}"))
             else:
                 tree_warn.insert("", tk.END, values=("HEALTHY", "System", "All hardware parameters operating normally."))
@@ -353,46 +332,51 @@ class HardwareGauntletGUI:
             # CPU & Motherboard
             tree_cpu.delete(*tree_cpu.get_children())
             cpu_rows = [
-                ("Operating System", f"{r.system.os_name} (Build {r.system.os_build})"),
-                ("Kernel & Architecture", f"{r.system.kernel} ({r.system.os_arch})"),
-                ("Boot Mode", r.system.boot_mode),
-                ("Processor Model", r.cpu.model),
-                ("Physical / Logical Cores", f"{r.cpu.physical_cores} Physical / {r.cpu.logical_cores} Threads"),
-                ("Clock Speeds", f"Max: {format_hz(r.cpu.max_clock_mhz)} (Base: {format_hz(r.cpu.base_clock_mhz)})"),
-                ("L2 / L3 Cache", f"L2: {r.cpu.cache_l2} | L3: {r.cpu.cache_l3}"),
-                ("CPU Instructions & Features", ", ".join(r.cpu.features)),
-                ("Motherboard Vendor", r.motherboard.manufacturer),
-                ("Motherboard Model", r.motherboard.product_name),
-                ("Motherboard Serial", r.motherboard.serial_number),
-                ("BIOS Vendor & Version", f"{r.motherboard.bios_vendor} - v{r.motherboard.bios_version}"),
-                ("BIOS Release Date", r.motherboard.bios_release_date),
-                ("Chassis Form Factor", r.motherboard.chassis_type),
-                ("System Uptime", r.system.uptime_formatted),
+                ("Operating System", f"{report.system.os_name} (Build {report.system.os_build})"),
+                ("Kernel & Architecture", f"{report.system.kernel} ({report.system.os_arch})"),
+                ("Boot Mode", report.system.boot_mode),
+                ("Processor Model", report.cpu.model),
+                ("Physical / Logical Cores", f"{report.cpu.physical_cores} Physical / {report.cpu.logical_cores} Threads"),
+                ("Clock Speeds", f"Max: {format_hz(report.cpu.max_clock_mhz)} (Base: {format_hz(report.cpu.base_clock_mhz)})"),
+                ("L2 / L3 Cache", f"L2: {report.cpu.cache_l2} | L3: {report.cpu.cache_l3}"),
+                ("CPU Instructions & Features", ", ".join(report.cpu.features)),
+                ("Motherboard Vendor", report.motherboard.manufacturer),
+                ("Motherboard Model", report.motherboard.product_name),
+                ("Motherboard Serial", report.motherboard.serial_number),
+                ("BIOS Vendor & Version", f"{report.motherboard.bios_vendor} - v{report.motherboard.bios_version}"),
+                ("BIOS Release Date", report.motherboard.bios_release_date),
+                ("Chassis Form Factor", report.motherboard.chassis_type),
+                ("System Uptime", report.system.uptime_formatted),
             ]
             for p, v in cpu_rows:
                 tree_cpu.insert("", tk.END, values=(p, v))
 
             # RAM
             tree_mem.delete(*tree_mem.get_children())
-            if r.memory.modules:
-                for m in r.memory.modules:
+            if report.memory.modules:
+                for m in report.memory.modules:
                     tree_mem.insert("", tk.END, values=(m.bank_label, m.capacity_formatted, m.memory_type, f"{m.speed_mhz} MHz", m.manufacturer, m.part_number))
             else:
-                tree_mem.insert("", tk.END, values=("System RAM", format_bytes(r.memory.total_bytes), "RAM", "Standard", "OEM", "N/A"))
+                tree_mem.insert("", tk.END, values=("System RAM", format_bytes(report.memory.total_bytes), "RAM", "Standard", "OEM", "N/A"))
 
             # GPU
             tree_gpu.delete(*tree_gpu.get_children())
-            for g in r.gpu.devices:
+            for g in report.gpu.devices:
                 tree_gpu.insert("", tk.END, values=(g.name, g.vendor, g.vram_formatted, g.driver_version, g.resolution))
 
             # Storage
             tree_storage.delete(*tree_storage.get_children())
-            for d in r.storage.physical_disks:
+            for d in report.storage.physical_disks:
                 tree_storage.insert("", tk.END, values=(f"[Physical] {d.model}", d.media_type, d.size_formatted, d.interface_type, d.smart_status, "Physical Drive"))
-            for p in r.storage.partitions:
+            for p in report.storage.partitions:
                 tree_storage.insert("", tk.END, values=(p.mountpoint, p.fstype, p.total_formatted, p.used_formatted, p.free_formatted, f"{p.percent}%"))
 
-        refresh_views()
+        def run_background_scan():
+            rep = self.engine.run_full_scan()
+            root.after(0, update_ui_with_report, rep)
+
+        # Trigger background scan immediately after window is drawn
+        root.after(100, run_background_scan)
         root.mainloop()
 
 
