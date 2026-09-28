@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Hardware Gauntlet - Cross-Platform System Diagnostic Suite</title>
+    <style>
+        :root {
+            --bg: #0b0f19;
+            --surface: #111827;
+            --border: #1f2937;
+            --primary: #38bdf8;
+            --accent: #818cf8;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --green: #10b981;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); line-height: 1.6; }
+        
+        .hero {
+            text-align: center;
+            padding: 80px 20px 40px;
+            background: radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.15) 0%, transparent 60%);
+            border-bottom: 1px solid var(--border);
+        }
+        .hero h1 { font-size: 3rem; font-weight: 800; background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .hero p { color: var(--text-dim); font-size: 1.2rem; max-width: 700px; margin: 16px auto 28px; }
+        
+        .detected-banner {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-size: 1rem;
+            color: #7dd3fc;
+            margin-bottom: 24px;
+        }
+
+        .container { max-width: 1140px; margin: 0 auto; padding: 48px 20px; }
+        
+        .os-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 28px;
+            margin-bottom: 60px;
+        }
+        .os-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: all 0.25s ease;
+        }
+        .os-card:hover { transform: translateY(-5px); border-color: var(--primary); }
+        .os-card.recommended {
+            border-color: #38bdf8;
+            box-shadow: 0 0 35px rgba(56, 189, 248, 0.25);
+        }
+        .os-card.recommended::before {
+            content: 'YOUR DETECTED OS';
+            position: absolute;
+            top: -13px;
+            left: 28px;
+            background: linear-gradient(90deg, #0284c7, #2563eb);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.8px;
+        }
+        .os-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+        .os-icon { font-size: 2.6rem; }
+        .os-header h3 { font-size: 1.5rem; font-weight: 700; }
+        .os-sub { color: var(--text-dim); font-size: 0.9rem; }
+        
+        .os-features { list-style: none; margin: 20px 0 28px; flex-grow: 1; }
+        .os-features li { margin-bottom: 10px; color: #cbd5e1; font-size: 0.92rem; display: flex; align-items: center; gap: 10px; }
+        .os-features li::before { content: '✓'; color: var(--green); font-weight: bold; }
+
+        .btn-download {
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            color: #fff;
+            text-decoration: none;
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+            text-align: center;
+            display: block;
+            margin-bottom: 14px;
+            transition: opacity 0.2s;
+        }
+        .btn-download:hover { opacity: 0.92; }
+
+        .cmd-box {
+            background: #090d16;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 12px 16px;
+            position: relative;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.82rem;
+            color: #38bdf8;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .copy-btn {
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            background: #1e293b;
+            color: #fff;
+            border: 1px solid #334155;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: #334155; }
+
+        .terminal-preview {
+            background: #090d16;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            font-family: monospace;
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 32px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .term-header { display: flex; gap: 8px; margin-bottom: 16px; }
+        .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .dot-red { background: #ef4444; }
+        .dot-yellow { background: #f59e0b; }
+        .dot-green { background: #10b981; }
+
+        footer { text-align: center; color: var(--text-dim); font-size: 0.9rem; padding: 48px 0; border-top: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>⚡ Hardware Gauntlet</h1>
+        <p>Universal hardware scanning and diagnostic suite for Windows, macOS, and Linux. Built for enthusiasts, IT administrators, and hardware diagnostics.</p>
+        <div id="detected-banner" class="detected-banner">
+            <span>🔍 Detecting your device operating system...</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="os-grid">
+            <!-- Windows -->
+            <div id="card-windows" class="os-card">
+                <div class="os-header">
+                    <div class="os-icon">🪟</div>
+                    <div>
+                        <h3>Windows</h3>
+                        <div class="os-sub">Windows 10, 11 & Windows Server</div>
+                    </div>
+                </div>
+                <ul class="os-features">
+                    <li>Single standalone .exe binary (zero dependencies)</li>
+                    <li>WMI & CIM deep hardware telemetry</li>
+                    <li>Motherboard, BIOS, TPM 2.0 & Secure Boot audit</li>
+                    <li>Dual-channel RAM DIMM slots & timings</li>
+                    <li>NVIDIA / AMD / Intel GPU VRAM & clock speed</li>
+                </ul>
+                <a href="https://github.com/agulh/Hardware-Gauntlet/releases/latest/download/hwscan-windows-x64.exe" class="btn-download">Download for Windows (.exe)</a>
+                <div class="cmd-box">
+                    <span>irm https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.ps1 | iex</span>
+                    <button class="copy-btn" onclick="copyText('irm https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.ps1 | iex')">Copy</button>
+                </div>
+            </div>
+
+            <!-- macOS -->
+            <div id="card-macos" class="os-card">
+                <div class="os-header">
+                    <div class="os-icon">🍎</div>
+                    <div>
+                        <h3>macOS</h3>
+                        <div class="os-sub">Apple Silicon (M1-M4) & Intel Macs</div>
+                    </div>
+                </div>
+                <ul class="os-features">
+                    <li>Universal binary for ARM64 & x86_64</li>
+                    <li>system_profiler & IOKit native integration</li>
+                    <li>Unified memory architecture & Neural Engine</li>
+                    <li>Battery cycle counts and capacity degradation</li>
+                    <li>APFS filesystem and storage metrics</li>
+                </ul>
+                <a href="https://github.com/agulh/Hardware-Gauntlet/releases/latest/download/hwscan-macos-universal" class="btn-download">Download for macOS (Universal)</a>
+                <div class="cmd-box">
+                    <span>curl -fsSL https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.sh | bash</span>
+                    <button class="copy-btn" onclick="copyText('curl -fsSL https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.sh | bash')">Copy</button>
+                </div>
+            </div>
+
+            <!-- Linux -->
+            <div id="card-linux" class="os-card">
+                <div class="os-header">
+                    <div class="os-icon">🐧</div>
+                    <div>
+                        <h3>Linux</h3>
+                        <div class="os-sub">Ubuntu, Debian, Fedora, Arch, RHEL</div>
+                    </div>
+                </div>
+                <ul class="os-features">
+                    <li>Standalone binary for x86_64 & ARM64</li>
+                    <li>Direct /proc, /sys & DMI hardware parsing</li>
+                    <li>Zero X11 / Wayland requirements for headless servers</li>
+                    <li>NVMe & SATA disk health via lsblk</li>
+                    <li>Automated health score & diagnostic warnings</li>
+                </ul>
+                <a href="https://github.com/agulh/Hardware-Gauntlet/releases/latest/download/hwscan-linux-x64" class="btn-download">Download for Linux (.tar.gz)</a>
+                <div class="cmd-box">
+                    <span>curl -fsSL https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.sh | bash</span>
+                    <button class="copy-btn" onclick="copyText('curl -fsSL https://raw.githubusercontent.com/agulh/Hardware-Gauntlet/main/distribution/install.sh | bash')">Copy</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal Output Preview -->
+        <h2 style="font-size: 1.5rem; margin-bottom: 16px;">🖥️ Terminal Preview</h2>
+        <div class="terminal-preview">
+            <div class="term-header">
+                <div class="term-dot dot-red"></div>
+                <div class="term-dot dot-yellow"></div>
+                <div class="term-dot dot-green"></div>
+            </div>
+            <pre style="color: #38bdf8; font-weight: bold;">$ hwscan</pre>
+            <pre style="color: #94a3b8;">
+╭─────────────────────────────────────────────────────────────────────────────╮
+│ [*] HARDWARE GAUNTLET - Universal System Diagnostic Suite                   │
+│ Host: WORKSTATION | OS: Windows 11 (AMD64) | Uptime: 1d 4h 12m             │
+│ Health Score: 100 / 100 (Scan completed in 0.84s)                           │
+╰─────────────────────────────────────────────────────────────────────────────╯
+[System & Motherboard]
+• Motherboard: Micro-Star International Co., Ltd. X470 GAMING PLUS MAX
+• BIOS: American Megatrends International - vH.M0 (2025-09-03)
+• UEFI Boot: Enabled | TPM 2.0: Active | Virtualization: Enabled
+
+[Processor & Memory]
+• CPU: AMD Ryzen 5 3600 6-Core Processor (6 Cores / 12 Threads @ 3.60 GHz)
+• RAM: 24 GB total (16GB Corsair DDR4 + 8GB A-DATA DDR4)
+
+[Graphics (GPU)]
+• NVIDIA GeForce RTX 5060 (8.0 GB VRAM, Driver 32.0.16.1088)
+
+[Storage]
+• KLEVV CRAS C910 Lite M.2 NVMe SSD 1TB (Health: OK)
+  └─ C:\ [NTFS]: 642 GB used / 953 GB total (311 GB free)
+            </pre>
+        </div>
+    </div>
+
+    <footer>
+        Hardware Gauntlet • Open Source Cross-Platform Hardware Diagnostic Suite
+    </footer>
+
+    <script>
+        (function() {
+            const ua = window.navigator.userAgent.toLowerCase();
+            const platform = window.navigator.platform ? window.navigator.platform.toLowerCase() : '';
+            let detected = "Unknown";
+            let targetCard = null;
+
+            if (ua.includes("win") || platform.includes("win")) {
+                detected = "Windows";
+                targetCard = document.getElementById("card-windows");
+            } else if (ua.includes("mac") || platform.includes("mac")) {
+                detected = "macOS";
+                targetCard = document.getElementById("card-macos");
+            } else if (ua.includes("linux") || platform.includes("linux")) {
+                detected = "Linux";
+                targetCard = document.getElementById("card-linux");
+            }
+
+            const banner = document.getElementById("detected-banner");
+            if (targetCard) {
+                targetCard.classList.add("recommended");
+                banner.innerHTML = `<span>💻 Detected: <strong>${detected}</strong> — Recommended download highlighted below!</span>`;
+            } else {
+                banner.innerHTML = `<span>🌐 Select your operating system below</span>`;
+            }
+        })();
+
+        function copyText(txt) {
+            navigator.clipboard.writeText(txt).then(() => {
+                alert("Command copied to clipboard: " + txt);
+            });
+        }
+    </script>
+</body>
+</html>

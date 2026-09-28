@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hwscan"
+version = "1.0.0"
+authors = [
+  { name="Hardware Gauntlet Contributors" },
+]
+description = "Universal Cross-Platform Hardware Scanner & Diagnostic Suite for Windows, macOS, and Linux"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "psutil>=5.9.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+hwscan = "hwscan.cli:main"
+
+[project.urls]
+"Homepage" = "https://github.com/agulh/Hardware-Gauntlet"
+"Bug Tracker" = "https://github.com/agulh/Hardware-Gauntlet/issues"
