@@ -857,12 +857,12 @@ class HardwareGauntletGUI:
         # -------------------------------------------------------------
         # Bubble Capsule Tab Navigation (Pure 100Days Pill Bar)
         # -------------------------------------------------------------
-        tab_bar = tk.Frame(root, padx=24, pady=(10, 8))
-        tab_bar.pack(fill=tk.X, side=tk.TOP)
+        tab_bar = tk.Frame(root, padx=24, pady=8)
+        tab_bar.pack(fill=tk.X, side=tk.TOP, pady=(10, 0))
         themed_widgets["root_bg"].append(tab_bar)
 
-        pages_container = tk.Frame(root, padx=24, pady=(0, 16))
-        pages_container.pack(fill=tk.BOTH, expand=True)
+        pages_container = tk.Frame(root, padx=24, pady=8)
+        pages_container.pack(fill=tk.BOTH, expand=True, pady=(0, 16))
         themed_widgets["root_bg"].append(pages_container)
 
         tab_definitions = [
