@@ -92,7 +92,7 @@ class SetupWizard:
 
         hdr_text = tk.Frame(hdr, bg=self.SURFACE)
         hdr_text.pack(side=tk.LEFT)
-        tk.Label(hdr_text, text="HARDWARE GAUNTLET", font=("Segoe UI", 16, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr_text, text="YOUR SYSTEM — HARDWARE GAUNTLET", font=("Segoe UI", 15, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
         tk.Label(hdr_text, text="Universal Native Diagnostic Suite • Pure Local & Offline", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=28, pady=20)
@@ -135,7 +135,7 @@ class SetupWizard:
 
         hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=16, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
-        tk.Label(hdr, text="Choose Install Location & Options", font=("Segoe UI", 14, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr, text="CARD 02 — INSTALL LOCATION & SYSTEM OPTIONS", font=("Segoe UI", 13, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=32, pady=20)
         body.pack(fill=tk.BOTH, expand=True)
@@ -171,7 +171,7 @@ class SetupWizard:
 
         hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=16, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
-        tk.Label(hdr, text="Installing Hardware Gauntlet...", font=("Segoe UI", 14, "bold"), fg=self.CYAN, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr, text="INSTALLATION IN PROGRESS —", font=("Segoe UI", 13, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=32, pady=28)
         body.pack(fill=tk.BOTH, expand=True)

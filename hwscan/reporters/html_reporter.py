@@ -1,20 +1,56 @@
-"""Interactive standalone HTML Diagnostic Report Generator for Hardware Gauntlet."""
+"""Interactive standalone HTML Diagnostic Report Generator for Hardware Gauntlet.
+
+Styled with duotone monochrome aesthetic, SVG radial thermostat dials, and clean pill components.
+"""
 
 import json
+import math
 from hwscan.core.models import HardwareReport
 from hwscan.core.utils import format_bytes, format_hz
 from hwscan.assets_data import LOGO_WHITE_B64
 
 
 class HTMLReporter:
-    """Generates a modern, self-contained interactive HTML hardware audit report."""
+    """Generates a modern, self-contained interactive HTML hardware audit report with radial dials."""
+
+    def _generate_svg_dial(self, score: int, title: str = "HEALTH SCORE") -> str:
+        ticks = 42
+        start_deg = 135.0
+        sweep_deg = 270.0
+        active_ticks = int(round((score / 100.0) * ticks))
+        lines_svg = []
+        cx, cy = 90.0, 90.0
+        r_outer = 72.0
+        r_inner = 62.0
+
+        for i in range(ticks):
+            frac = i / float(ticks - 1)
+            deg = start_deg + frac * sweep_deg
+            rad = math.radians(deg)
+            x1 = cx + r_inner * math.cos(rad)
+            y1 = cy + r_inner * math.sin(rad)
+            x2 = cx + r_outer * math.cos(rad)
+            y2 = cy + r_outer * math.sin(rad)
+            color = "var(--dial-active)" if i <= active_ticks else "var(--dial-inactive)"
+            width = "3" if i <= active_ticks else "2"
+            lines_svg.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="{color}" stroke-width="{width}" stroke-linecap="round" />')
+
+        ticks_str = "\n            ".join(lines_svg)
+        sub = "OPTIMAL" if score >= 85 else ("ATTENTION" if score >= 70 else "CRITICAL")
+        return f"""
+        <svg width="180" height="180" viewBox="0 0 180 180" class="dial-svg">
+            {ticks_str}
+            <text x="90" y="86" text-anchor="middle" class="dial-val">{score}</text>
+            <text x="90" y="106" text-anchor="middle" class="dial-sub">{sub}</text>
+            <text x="90" y="152" text-anchor="middle" class="dial-title">{title}</text>
+        </svg>
+        """
 
     def to_html(self, report: HardwareReport) -> str:
         report_json = json.dumps(report.to_dict(), indent=2, default=str)
         score = report.health_score
-        score_class = "score-high" if score >= 85 else ("score-med" if score >= 70 else "score-low")
+        svg_dial = self._generate_svg_dial(score, "HEALTH SCORE")
 
-        # Partitions rows
         part_rows = ""
         for p in report.storage.partitions:
             bar_color = "#ef4444" if p.percent > 85 else ("#f59e0b" if p.percent > 70 else "#10b981")
@@ -29,47 +65,44 @@ class HTMLReporter:
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: {p.percent}%; background-color: {bar_color};"></div>
                     </div>
-                    <span style="font-size: 0.8rem; color: #94a3b8;">{p.percent}%</span>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">{p.percent}%</span>
                 </td>
             </tr>
             """
 
-        # Disks rows
         disk_rows = ""
         for d in report.storage.physical_disks:
             disk_rows += f"""
             <tr>
                 <td style="font-weight: 600;">{d.model}</td>
-                <td><span class="badge badge-blue">{d.media_type}</span></td>
+                <td><span class="badge badge-gray">{d.media_type}</span></td>
                 <td>{d.interface_type}</td>
                 <td>{d.size_formatted}</td>
                 <td><code>{d.serial_number}</code></td>
-                <td><span class="badge badge-green">{d.smart_status}</span></td>
+                <td><span class="badge badge-active">{d.smart_status}</span></td>
             </tr>
             """
 
-        # DIMM rows
         dimm_rows = ""
         for m in report.memory.modules:
             dimm_rows += f"""
             <tr>
                 <td style="font-weight: 600;">{m.bank_label}</td>
                 <td>{m.capacity_formatted}</td>
-                <td><span class="badge badge-purple">{m.memory_type}</span></td>
+                <td><span class="badge badge-gray">{m.memory_type}</span></td>
                 <td>{m.speed_mhz} MHz</td>
                 <td>{m.manufacturer}</td>
                 <td><code>{m.part_number}</code></td>
             </tr>
             """
 
-        # GPU rows
         gpu_rows = ""
         for g in report.gpu.devices:
             gpu_rows += f"""
-            <div class="card gpu-card">
+            <div class="card gpu-card" style="margin-bottom: 14px;">
                 <div class="card-header">
                     <h3>🎮 {g.name}</h3>
-                    <span class="badge badge-purple">{g.vendor}</span>
+                    <span class="badge badge-gray">{g.vendor}</span>
                 </div>
                 <div class="meta-grid">
                     <div><span class="label">Dedicated VRAM:</span> <span class="val">{g.vram_formatted}</span></div>
@@ -79,27 +112,25 @@ class HTMLReporter:
             </div>
             """
 
-        # Warnings cards
         warn_html = ""
         if report.warnings:
             for w in report.warnings:
-                w_class = "badge-red" if w.level == "CRITICAL" else ("badge-yellow" if w.level == "WARNING" else "badge-blue")
+                w_class = "badge-red" if w.level == "CRITICAL" else ("badge-yellow" if w.level == "WARNING" else "badge-gray")
                 warn_html += f"""
                 <div class="warning-item">
                     <span class="badge {w_class}">{w.level}</span>
                     <span class="badge badge-gray">{w.category}</span>
                     <strong style="margin-left: 8px;">{w.title}</strong>
-                    <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 0.9rem;">{w.description}</p>
+                    <p style="margin: 6px 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">{w.description}</p>
                 </div>
                 """
         else:
-            warn_html = "<div class='warning-item' style='border-left-color: #10b981;'><span class='badge badge-green'>HEALTHY</span> <strong>All system checks passed with optimal parameters!</strong></div>"
+            warn_html = "<div class='warning-item' style='border-left-color: var(--accent-btn);'><span class='badge badge-active'>HEALTHY</span> <strong>All system checks passed with optimal parameters!</strong></div>"
 
-        # Active Network interfaces
         net_rows = ""
         for n in report.network.interfaces:
             if n.is_up or n.ipv4:
-                status_badge = '<span class="badge badge-green">UP</span>' if n.is_up else '<span class="badge badge-gray">DOWN</span>'
+                status_badge = '<span class="badge badge-active">UP</span>' if n.is_up else '<span class="badge badge-gray">DOWN</span>'
                 ips = ", ".join(n.ipv4) if n.ipv4 else "N/A"
                 speed = f"{n.speed_mbps} Mbps" if n.speed_mbps > 0 else "Dynamic"
                 net_rows += f"""
@@ -112,7 +143,6 @@ class HTMLReporter:
                 </tr>
                 """
 
-        # Build full HTML
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -122,27 +152,31 @@ class HTMLReporter:
     <style>
         :root {{
             --bg-color: #09090b;
-            --surface-color: #121215;
-            --surface-card: #18181b;
-            --surface-border: #27272a;
+            --surface-color: #111114;
+            --surface-card: #16161a;
+            --surface-border: #27272e;
             --text-primary: #ffffff;
             --text-secondary: #a1a1aa;
-            --accent-green: #ffffff;
-            --accent-yellow: #f59e0b;
-            --accent-red: #ef4444;
-            --accent-purple: #d4d4d8;
+            --text-muted: #71717a;
+            --accent-btn: #ffffff;
+            --accent-btn-text: #09090b;
+            --dial-active: #ffffff;
+            --dial-inactive: #27272e;
+            --card-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }}
         [data-theme="light"] {{
-            --bg-color: #f4f4f5;
+            --bg-color: #f5f5f7;
             --surface-color: #ffffff;
-            --surface-card: #f8fafc;
-            --surface-border: #e2e8f0;
+            --surface-card: #ffffff;
+            --surface-border: #e5e5ea;
             --text-primary: #09090b;
             --text-secondary: #64748b;
-            --accent-green: #09090b;
-            --accent-yellow: #d97706;
-            --accent-red: #dc2626;
-            --accent-purple: #475569;
+            --text-muted: #94a3b8;
+            --accent-btn: #09090b;
+            --accent-btn-text: #ffffff;
+            --dial-active: #09090b;
+            --dial-inactive: #e2e8f0;
+            --card-shadow: 0 4px 20px rgba(0,0,0,0.06);
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
         body {{ background-color: var(--bg-color); color: var(--text-primary); line-height: 1.6; padding: 24px; transition: background 0.2s, color 0.2s; }}
@@ -155,101 +189,115 @@ class HTMLReporter:
             background: var(--surface-color);
             border: 1px solid var(--surface-border);
             padding: 24px 32px;
-            border-radius: 16px;
+            border-radius: 20px;
             margin-bottom: 24px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            box-shadow: var(--card-shadow);
         }}
-        .header-title-box {{ display: flex; align-items: center; gap: 16px; }}
-        .header-logo {{ width: 52px; height: 52px; border-radius: 10px; }}
-        .header-title h1 {{ font-size: 1.8rem; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; }}
-        .header-title p {{ color: var(--text-secondary); font-size: 0.95rem; margin-top: 4px; }}
-        .header-score {{ display: flex; align-items: center; gap: 16px; }}
-        
-        .score-box {{
-            text-align: center;
-            padding: 12px 20px;
-            border-radius: 12px;
-            background: var(--surface-card);
-            border: 1px solid var(--surface-border);
-        }}
-        .score-high {{ color: #ffffff; border-color: #3f3f46; }}
-        .score-med {{ color: var(--accent-yellow); border-color: rgba(245, 158, 11, 0.4); }}
-        .score-low {{ color: var(--accent-red); border-color: rgba(239, 68, 68, 0.4); }}
-        .score-box .num {{ font-size: 2.2rem; font-weight: 800; line-height: 1; }}
-        .score-box .lbl {{ font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); }}
-
+        .header-title-box {{ display: flex; align-items: center; gap: 18px; }}
+        .header-logo {{ width: 54px; height: 54px; border-radius: 12px; }}
+        .header-title h1 {{ font-size: 1.7rem; font-weight: 800; letter-spacing: 0.5px; }}
+        .header-title p {{ color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; }}
         .actions {{ display: flex; gap: 10px; }}
+        
         button.btn {{
             background: var(--surface-card);
-            color: #ffffff;
+            color: var(--text-primary);
             border: 1px solid var(--surface-border);
-            padding: 10px 18px;
-            border-radius: 8px;
-            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s;
             display: inline-flex;
             align-items: center;
             gap: 8px;
         }}
-        button.btn:hover {{ background: #27272a; border-color: #3f3f46; }}
-        button.btn-primary {{ background: #ffffff; color: #09090b; border: 1px solid #ffffff; }}
-        button.btn-primary:hover {{ background: #e4e4e7; }}
+        button.btn:hover {{ filter: brightness(1.15); }}
+        button.btn-primary {{ background: var(--accent-btn); color: var(--accent-btn-text); border: 1px solid var(--accent-btn); }}
+
+        /* Top Hero Layout */
+        .hero-grid {{
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }}
+        @media (max-width: 860px) {{
+            .hero-grid {{ grid-template-columns: 1fr; }}
+            header {{ flex-direction: column; gap: 16px; align-items: flex-start; }}
+        }}
+
+        .dial-card {{
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }}
+        .dial-card .card-title {{ font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-primary); margin-bottom: 4px; align-self: flex-start; }}
+        .dial-card .card-sub {{ font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px; align-self: flex-start; }}
+        
+        .dial-svg {{ margin: 0 auto; display: block; }}
+        .dial-val {{ font-size: 28px; font-weight: 800; fill: var(--text-primary); }}
+        .dial-sub {{ font-size: 10px; font-weight: 800; fill: var(--text-secondary); letter-spacing: 1px; }}
+        .dial-title {{ font-size: 9px; font-weight: 800; fill: var(--text-muted); letter-spacing: 1px; }}
 
         .grid-cards {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 16px;
-            margin-bottom: 24px;
+        }}
+        @media (max-width: 600px) {{
+            .grid-cards {{ grid-template-columns: 1fr; }}
         }}
         .stat-card {{
             background: var(--surface-color);
             border: 1px solid var(--surface-border);
-            border-radius: 12px;
+            border-radius: 18px;
             padding: 20px;
-            position: relative;
-            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }}
-        .stat-card::before {{
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 2px;
-            background: #ffffff;
-        }}
-        .stat-card h4 {{ color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }}
-        .stat-card .val {{ font-size: 1.3rem; font-weight: 700; color: #fff; }}
-        .stat-card .sub {{ font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; }}
+        .stat-card h4 {{ color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 700; }}
+        .stat-card .val {{ font-size: 1.25rem; font-weight: 800; color: var(--text-primary); }}
+        .stat-card .sub {{ font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }}
 
         .card {{
             background: var(--surface-color);
             border: 1px solid var(--surface-border);
-            border-radius: 12px;
+            border-radius: 20px;
             padding: 24px;
             margin-bottom: 24px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            box-shadow: var(--card-shadow);
         }}
         .card-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }}
-        .card-header h3 {{ font-size: 1.25rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; }}
+        .card-header h3 {{ font-size: 1.15rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }}
 
         table {{ width: 100%; border-collapse: collapse; text-align: left; }}
-        th {{ background: var(--surface-card); color: #ffffff; padding: 12px 16px; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid var(--surface-border); }}
-        td {{ padding: 12px 16px; border-bottom: 1px solid var(--surface-border); font-size: 0.95rem; color: #fafafa; }}
-        tr:hover td {{ background: rgba(255,255,255,0.02); }}
+        th {{ background: var(--surface-card); color: var(--text-primary); padding: 12px 16px; font-size: 0.8rem; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid var(--surface-border); }}
+        td {{ padding: 12px 16px; border-bottom: 1px solid var(--surface-border); font-size: 0.9rem; color: var(--text-primary); }}
+        tr:hover td {{ background: rgba(125,125,125,0.04); }}
 
         .badge {{
             display: inline-block;
             padding: 4px 10px;
-            border-radius: 6px;
+            border-radius: 14px;
             font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
         }}
-        .badge-green {{ background: rgba(255, 255, 255, 0.1); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.2); }}
-        .badge-blue {{ background: rgba(228, 228, 231, 0.1); color: #e4e4e7; border: 1px solid rgba(228, 228, 231, 0.2); }}
-        .badge-purple {{ background: rgba(161, 161, 170, 0.1); color: #d4d4d8; border: 1px solid rgba(161, 161, 170, 0.2); }}
+        .badge-active {{ background: var(--accent-btn); color: var(--accent-btn-text); }}
+        .badge-gray {{ background: var(--surface-card); color: var(--text-secondary); border: 1px solid var(--surface-border); }}
         .badge-yellow {{ background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); }}
         .badge-red {{ background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }}
-        .badge-gray {{ background: rgba(161, 161, 170, 0.1); color: #a1a1aa; border: 1px solid rgba(161, 161, 170, 0.2); }}
 
         .progress-bar {{
             background: var(--surface-card);
@@ -267,23 +315,23 @@ class HTMLReporter:
         .warning-item {{
             background: var(--surface-card);
             border: 1px solid var(--surface-border);
-            border-left: 4px solid var(--accent-yellow);
+            border-left: 4px solid var(--accent-btn);
             padding: 14px 18px;
-            border-radius: 0 8px 8px 0;
+            border-radius: 0 12px 12px 0;
             margin-bottom: 12px;
         }}
 
         .meta-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
             margin-top: 12px;
         }}
-        .meta-grid .label {{ color: var(--text-secondary); font-size: 0.85rem; display: block; }}
-        .meta-grid .val {{ color: #ffffff; font-weight: 600; font-size: 1rem; }}
-        code {{ background: var(--surface-card); border: 1px solid var(--surface-border); padding: 2px 6px; border-radius: 4px; color: #ffffff; font-family: monospace; font-size: 0.85rem; }}
+        .meta-grid .label {{ color: var(--text-secondary); font-size: 0.8rem; display: block; font-weight: 600; text-transform: uppercase; }}
+        .meta-grid .val {{ color: var(--text-primary); font-weight: 700; font-size: 0.95rem; }}
+        code {{ background: var(--surface-card); border: 1px solid var(--surface-border); padding: 3px 8px; border-radius: 6px; color: var(--text-primary); font-family: monospace; font-size: 0.85rem; }}
 
-        footer {{ text-align: center; color: var(--text-secondary); font-size: 0.85rem; margin-top: 32px; padding: 16px; }}
+        footer {{ text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: 32px; padding: 16px; }}
         @media print {{ body {{ background: #fff; color: #000; }} header, .stat-card, .card {{ border: 1px solid #ccc; }} .actions {{ display: none; }} }}
     </style>
 </head>
@@ -293,51 +341,52 @@ class HTMLReporter:
             <div class="header-title-box">
                 <img src="data:image/png;base64,{LOGO_WHITE_B64}" class="header-logo" alt="Hardware Gauntlet Logo" />
                 <div class="header-title">
-                    <h1>HARDWARE GAUNTLET</h1>
-                    <p>Host: <strong>{report.system.hostname}</strong> • Scan: {report.system.timestamp} (Duration: {report.scan_duration_seconds}s)</p>
+                    <h1>YOUR SYSTEM — HARDWARE GAUNTLET</h1>
+                    <p>Host: <strong>{report.system.hostname}</strong> • Scan Duration: {report.scan_duration_seconds}s • Timestamp: {report.system.timestamp}</p>
                 </div>
             </div>
-            <div class="header-score">
-                <div class="score-box {score_class}">
-                    <div class="num">{score}</div>
-                    <div class="lbl">Health Score</div>
-                </div>
-                <div class="actions">
-                    <button class="btn" onclick="toggleTheme()" id="themeBtn">☀️ Light Mode</button>
-                    <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
-                    <button class="btn" onclick="downloadJSON()">Export JSON</button>
-                </div>
+            <div class="actions">
+                <button class="btn" onclick="toggleTheme()" id="themeBtn">☀️ Light Mode</button>
+                <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
+                <button class="btn" onclick="downloadJSON()">Export JSON</button>
             </div>
         </header>
 
-        <!-- KPI Cards -->
-        <div class="grid-cards">
-            <div class="stat-card">
-                <h4>Operating System</h4>
-                <div class="val">{report.system.os_name}</div>
-                <div class="sub">Kernel: {report.system.kernel} ({report.system.boot_mode})</div>
+        <!-- Top Hero with Thermostat Radial Dial -->
+        <div class="hero-grid">
+            <div class="dial-card">
+                <div class="card-title">CARD 01 — SYSTEM HEALTH</div>
+                <div class="card-sub">Real-time hardware integrity rating</div>
+                {svg_dial}
             </div>
-            <div class="stat-card">
-                <h4>Processor (CPU)</h4>
-                <div class="val">{report.cpu.model.split()[0]} {report.cpu.model.split()[1] if len(report.cpu.model.split()) > 1 else ''}</div>
-                <div class="sub">{report.cpu.physical_cores} Cores / {report.cpu.logical_cores} Threads @ {format_hz(report.cpu.max_clock_mhz)}</div>
-            </div>
-            <div class="stat-card">
-                <h4>Memory (RAM)</h4>
-                <div class="val">{format_bytes(report.memory.total_bytes)}</div>
-                <div class="sub">{report.memory.percent}% Used ({len(report.memory.modules)} DIMM slots)</div>
-            </div>
-            <div class="stat-card">
-                <h4>Security & Boot</h4>
-                <div class="val">{'Secure Boot OK' if report.security.secure_boot else 'Secure Boot OFF'}</div>
-                <div class="sub">TPM: {'Active' if report.security.tpm_present else 'None'} | VT-x/AMD-V: {'Active' if report.security.virtualization_enabled else 'Disabled'}</div>
+            <div class="grid-cards">
+                <div class="stat-card">
+                    <h4>CARD 02 — Operating System</h4>
+                    <div class="val">{report.system.os_name}</div>
+                    <div class="sub">Kernel: {report.system.kernel} ({report.system.boot_mode})</div>
+                </div>
+                <div class="stat-card">
+                    <h4>CARD 03 — Processor (CPU)</h4>
+                    <div class="val">{report.cpu.model.split()[0]} {report.cpu.model.split()[1] if len(report.cpu.model.split()) > 1 else ''}</div>
+                    <div class="sub">{report.cpu.physical_cores} Cores / {report.cpu.logical_cores} Threads @ {format_hz(report.cpu.max_clock_mhz)}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>CARD 04 — Memory (RAM)</h4>
+                    <div class="val">{format_bytes(report.memory.total_bytes)}</div>
+                    <div class="sub">{report.memory.percent}% Used ({len(report.memory.modules)} DIMM modules)</div>
+                </div>
+                <div class="stat-card">
+                    <h4>CARD 05 — Security & Boot</h4>
+                    <div class="val">{'Secure Boot OK' if report.security.secure_boot else 'Secure Boot OFF'}</div>
+                    <div class="sub">TPM: {'Active' if report.security.tpm_present else 'None'} | VT-x/AMD-V: {'Active' if report.security.virtualization_enabled else 'Disabled'}</div>
+                </div>
             </div>
         </div>
 
         <!-- Health Findings -->
         <div class="card">
             <div class="card-header">
-                <h3>🔍 Diagnostics & Health Findings</h3>
+                <h3>🔍 HARDWARE AUDIT FINDINGS & ALERTS —</h3>
             </div>
             {warn_html}
         </div>
@@ -345,7 +394,7 @@ class HTMLReporter:
         <!-- CPU & Motherboard -->
         <div class="card">
             <div class="card-header">
-                <h3>🧠 Processor & Motherboard Specifications</h3>
+                <h3>🧠 PROCESSOR & MOTHERBOARD SPECIFICATIONS —</h3>
             </div>
             <div class="meta-grid">
                 <div><span class="label">CPU Full Model</span><span class="val">{report.cpu.model}</span></div>
@@ -362,8 +411,8 @@ class HTMLReporter:
         <!-- Memory Modules -->
         <div class="card">
             <div class="card-header">
-                <h3>📊 Memory & DIMM Slots</h3>
-                <span class="badge badge-blue">Total: {format_bytes(report.memory.total_bytes)}</span>
+                <h3>💾 MEMORY & DIMM SLOTS —</h3>
+                <span class="badge badge-gray">Total: {format_bytes(report.memory.total_bytes)}</span>
             </div>
             <table>
                 <thead>
@@ -385,7 +434,7 @@ class HTMLReporter:
         <!-- GPUs -->
         <div class="card">
             <div class="card-header">
-                <h3>🎮 Graphics Adapters</h3>
+                <h3>🎮 GRAPHICS ACCELERATORS —</h3>
             </div>
             {gpu_rows}
         </div>
@@ -393,7 +442,7 @@ class HTMLReporter:
         <!-- Storage Drives -->
         <div class="card">
             <div class="card-header">
-                <h3>💾 Physical Storage Disks</h3>
+                <h3>💽 PHYSICAL STORAGE DISKS —</h3>
             </div>
             <table>
                 <thead>
@@ -415,7 +464,7 @@ class HTMLReporter:
         <!-- Partitions -->
         <div class="card">
             <div class="card-header">
-                <h3>📁 Mounted Filesystems & Partitions</h3>
+                <h3>📁 MOUNTED FILESYSTEMS & PARTITIONS —</h3>
             </div>
             <table>
                 <thead>
@@ -437,7 +486,7 @@ class HTMLReporter:
         <!-- Network Adapters -->
         <div class="card">
             <div class="card-header">
-                <h3>🌐 Active Network Interfaces</h3>
+                <h3>🌐 ACTIVE NETWORK INTERFACES —</h3>
             </div>
             <table>
                 <thead>
@@ -456,7 +505,7 @@ class HTMLReporter:
         </div>
 
         <footer>
-            Generated by <strong>Hardware Gauntlet v1.0.0</strong> • Cross-Platform System Hardware Scanner
+            Generated by <strong>Hardware Gauntlet v1.0.0</strong> • Pure Local System Hardware Scanner
         </footer>
     </div>
 

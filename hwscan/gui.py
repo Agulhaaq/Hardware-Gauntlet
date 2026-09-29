@@ -1,13 +1,22 @@
-"""Native Desktop GUI Application for Hardware Gauntlet with Clean Modern UI, Dark/Light Themes, Single-Instance Lock, Manual Scan, and Stress Test Suite."""
+"""Native Desktop GUI Application for Hardware Gauntlet with Clean Modern Duotone Design.
+
+Inspired by 100Days Design aesthetic:
+- Thermostat-style circular radial tick dials
+- Sleek pill toggle switches & pill action buttons
+- Minimalist duotone monochrome palette (pure Obsidian & Slate)
+- Categorized cards with stylized dashes ('YOUR SYSTEM —', 'CARD 01 —', 'THERMAL DIAL —')
+- Single-instance mutex enforcement & on-demand manual hardware scan
+"""
 
 import os
 import sys
 import json
 import time
+import math
 import subprocess
 import webbrowser
 import threading
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 
 from hwscan.core.system_info import HardwareScannerEngine
 from hwscan.reporters.html_reporter import HTMLReporter
@@ -28,32 +37,38 @@ THEMES = {
     "dark": {
         "name": "dark",
         "bg": "#09090b",
-        "surface": "#121215",
-        "card": "#18181b",
-        "card_alt": "#1f1f23",
-        "border": "#27272a",
-        "border_subtle": "#1e1e24",
-        "border_light": "#3f3f46",
+        "surface": "#111114",
+        "card": "#16161a",
+        "card_alt": "#1e1e24",
+        "border": "#27272e",
+        "border_subtle": "#1d1d22",
+        "border_light": "#383842",
         "text": "#ffffff",
         "text_dim": "#a1a1aa",
         "text_muted": "#71717a",
         "accent": "#ffffff",
         "accent_text": "#09090b",
         "accent_hover": "#e4e4e7",
-        "btn_bg": "#18181b",
+        "btn_bg": "#1e1e24",
         "btn_fg": "#ffffff",
-        "btn_border": "#27272a",
-        "btn_hover": "#27272a",
+        "btn_border": "#2c2c34",
+        "btn_hover": "#282830",
+        "pill_bg": "#23232a",
+        "pill_active": "#ffffff",
+        "pill_knob": "#09090b",
+        "dial_bg": "#16161a",
+        "dial_active": "#ffffff",
+        "dial_inactive": "#27272e",
         "console_bg": "#0c0c0e",
         "console_fg": "#e4e4e7",
-        "tree_bg": "#121215",
+        "tree_bg": "#111114",
         "tree_fg": "#ffffff",
-        "tree_alt": "#16161a",
-        "tree_head_bg": "#18181b",
+        "tree_alt": "#141418",
+        "tree_head_bg": "#18181d",
         "tree_head_fg": "#ffffff",
-        "tree_sel_bg": "#27272a",
+        "tree_sel_bg": "#27272e",
         "tree_sel_fg": "#ffffff",
-        "tab_bg": "#18181b",
+        "tab_bg": "#18181d",
         "tab_fg": "#a1a1aa",
         "tab_sel_bg": "#ffffff",
         "tab_sel_fg": "#09090b",
@@ -63,13 +78,13 @@ THEMES = {
     },
     "light": {
         "name": "light",
-        "bg": "#f4f4f5",
+        "bg": "#f5f5f7",
         "surface": "#ffffff",
-        "card": "#f8fafc",
-        "card_alt": "#f1f5f9",
-        "border": "#e2e8f0",
-        "border_subtle": "#e4e4e7",
-        "border_light": "#cbd5e1",
+        "card": "#ffffff",
+        "card_alt": "#f0f0f3",
+        "border": "#e5e5ea",
+        "border_subtle": "#ededf2",
+        "border_light": "#d1d1d6",
         "text": "#09090b",
         "text_dim": "#64748b",
         "text_muted": "#94a3b8",
@@ -80,6 +95,12 @@ THEMES = {
         "btn_fg": "#0f172a",
         "btn_border": "#e2e8f0",
         "btn_hover": "#f1f5f9",
+        "pill_bg": "#e2e8f0",
+        "pill_active": "#09090b",
+        "pill_knob": "#ffffff",
+        "dial_bg": "#ffffff",
+        "dial_active": "#09090b",
+        "dial_inactive": "#e2e8f0",
         "console_bg": "#f8fafc",
         "console_fg": "#0f172a",
         "tree_bg": "#ffffff",
@@ -103,19 +124,15 @@ THEMES = {
 def get_asset_file_path(filename: str) -> str:
     """Resolve asset paths whether running from source, PyInstaller bundle, or installed directory."""
     candidates = []
-    # PyInstaller extracted bundle dir
     if hasattr(sys, "_MEIPASS"):
         candidates.append(os.path.join(sys._MEIPASS, "assets", filename))
         candidates.append(os.path.join(sys._MEIPASS, filename))
-    # Next to executable
     exe_dir = os.path.dirname(os.path.abspath(sys.executable))
     candidates.append(os.path.join(exe_dir, "assets", filename))
     candidates.append(os.path.join(exe_dir, filename))
-    # Source repository root
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidates.append(os.path.join(repo_root, "assets", filename))
     candidates.append(os.path.join(repo_root, filename))
-    # LocalAppData install dir
     appdata = os.environ.get("LOCALAPPDATA", "")
     if appdata:
         candidates.append(os.path.join(appdata, "Programs", "HardwareGauntlet", "assets", filename))
@@ -126,8 +143,137 @@ def get_asset_file_path(filename: str) -> str:
     return os.path.join(repo_root, "assets", filename)
 
 
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+
+
+class RadialDialWidget(tk.Canvas):
+    """Circular Radial Dial Widget with perimeter tick marks matching thermostat design."""
+
+    def __init__(self, parent, size: int = 176, title: str = "GAUGE", value_str: str = "--", unit: str = "", sub_str: str = "READY", percent: float = 0.0, **kwargs):
+        super().__init__(parent, width=size, height=size, highlightthickness=0, **kwargs)
+        self.size = size
+        self.title_text = title
+        self.value_str = value_str
+        self.unit = unit
+        self.sub_str = sub_str
+        self.percent = percent
+        self.bg_color = "#16161a"
+        self.dial_active = "#ffffff"
+        self.dial_inactive = "#27272e"
+        self.text_color = "#ffffff"
+        self.dim_color = "#a1a1aa"
+        self.draw()
+
+    def set_theme(self, bg: str, active_color: str, inactive_color: str, text_color: str, dim_color: str):
+        self.bg_color = bg
+        self.dial_active = active_color
+        self.dial_inactive = inactive_color
+        self.text_color = text_color
+        self.dim_color = dim_color
+        self.configure(bg=bg)
+        self.draw()
+
+    def update_value(self, value_str: str, percent: float = 0.0, sub_str: str = "", unit: str = None):
+        self.value_str = value_str
+        self.percent = max(0.0, min(100.0, percent))
+        if sub_str:
+            self.sub_str = sub_str
+        if unit is not None:
+            self.unit = unit
+        self.draw()
+
+    def draw(self):
+        self.delete("all")
+        cx = self.size / 2.0
+        cy = self.size / 2.0
+        radius = (self.size / 2.0) - 16
+        inner_radius = radius - 10
+
+        # Radial ticks sweeping 270 degrees
+        start_angle = 135.0
+        sweep_angle = 270.0
+        num_ticks = 42
+
+        active_count = int(round((self.percent / 100.0) * num_ticks))
+
+        for i in range(num_ticks):
+            fraction = i / float(num_ticks - 1)
+            deg = start_angle + fraction * sweep_angle
+            rad = math.radians(deg)
+
+            x1 = cx + (inner_radius * math.cos(rad))
+            y1 = cy + (inner_radius * math.sin(rad))
+            x2 = cx + (radius * math.cos(rad))
+            y2 = cy + (radius * math.sin(rad))
+
+            color = self.dial_active if i <= active_count and active_count > 0 else self.dial_inactive
+            width = 3 if (i <= active_count and active_count > 0) else 2
+            self.create_line(x1, y1, x2, y2, fill=color, width=width, capstyle=tk.ROUND)
+
+        # Center value (e.g. 26°C, 100, 95, 4.2 GHz)
+        display_val = f"{self.value_str}{self.unit}"
+        val_font_size = 20 if len(display_val) <= 4 else 16
+        self.create_text(cx, cy - 8, text=display_val, fill=self.text_color, font=("Segoe UI", val_font_size, "bold"))
+
+        # Small sub-status (e.g. "COOLING", "OPTIMAL", "READY")
+        self.create_text(cx, cy + 16, text=self.sub_str.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
+
+        # Bottom label in arc gap (e.g. "TEMP", "HEALTH SCORE", "CPU LOAD")
+        self.create_text(cx, cy + radius - 4, text=self.title_text.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
+
+
+class PillToggle(tk.Canvas):
+    """Pill-shaped toggle switch widget matching clean black-and-white switches."""
+
+    def __init__(self, parent, initial: bool = True, on_toggle: Optional[Callable[[bool], None]] = None, **kwargs):
+        super().__init__(parent, width=46, height=24, highlightthickness=0, cursor="hand2", **kwargs)
+        self.is_on = initial
+        self.on_toggle = on_toggle
+        self.bg_parent = "#16161a"
+        self.pill_bg_off = "#23232a"
+        self.pill_bg_on = "#ffffff"
+        self.knob_color_off = "#a1a1aa"
+        self.knob_color_on = "#09090b"
+        self.bind("<Button-1>", self._on_click)
+        self.draw()
+
+    def set_theme(self, bg_parent: str, pill_bg_off: str, pill_bg_on: str, knob_color_on: str):
+        self.bg_parent = bg_parent
+        self.pill_bg_off = pill_bg_off
+        self.pill_bg_on = pill_bg_on
+        self.knob_color_on = knob_color_on
+        self.configure(bg=bg_parent)
+        self.draw()
+
+    def set_state(self, is_on: bool):
+        self.is_on = is_on
+        self.draw()
+
+    def _on_click(self, event):
+        self.is_on = not self.is_on
+        self.draw()
+        if self.on_toggle:
+            self.on_toggle(self.is_on)
+
+    def draw(self):
+        self.delete("all")
+        # Pill capsule
+        fill_color = self.pill_bg_on if self.is_on else self.pill_bg_off
+        self.create_oval(2, 2, 22, 22, fill=fill_color, outline="")
+        self.create_oval(24, 2, 44, 22, fill=fill_color, outline="")
+        self.create_rectangle(12, 2, 34, 22, fill=fill_color, outline="")
+
+        # Circular knob
+        knob_color = self.knob_color_on if self.is_on else self.knob_color_off
+        if self.is_on:
+            self.create_oval(26, 4, 42, 20, fill=knob_color, outline="")
+        else:
+            self.create_oval(4, 4, 20, 20, fill=knob_color, outline="")
+
+
 class HardwareGauntletGUI:
-    """Orchestrates launching the modern clean desktop application with dual dark/light themes."""
+    """Orchestrates modern desktop application with clean monochrome design and radial dials."""
 
     def __init__(self):
         self.engine = HardwareScannerEngine()
@@ -147,16 +293,12 @@ class HardwareGauntletGUI:
         self._run_tkinter()
 
     def _run_tkinter(self) -> None:
-        """Render native Tkinter GUI with clean layout, manual scan controls, and stress test engine."""
-        import tkinter as tk
-        from tkinter import ttk, messagebox, filedialog
-
+        """Render native Tkinter GUI with duotone design and radial thermostat gauges."""
         root = tk.Tk()
         root.title(WINDOW_TITLE)
-        root.geometry("1160x800")
-        root.minsize(960, 680)
+        root.geometry("1180x820")
+        root.minsize(980, 700)
 
-        # Set window icon
         ico_path = get_asset_file_path("app.ico")
         if sys.platform == "win32" and os.path.exists(ico_path):
             try:
@@ -164,7 +306,6 @@ class HardwareGauntletGUI:
             except Exception:
                 pass
 
-        # Registry for dynamic theme re-styling
         themed_widgets = {
             "root_bg": [root],
             "surface": [],
@@ -178,6 +319,8 @@ class HardwareGauntletGUI:
             "btn_secondary": [],
             "consoles": [],
             "treeviews": [],
+            "dials": [],
+            "pill_toggles": []
         }
 
         style = ttk.Style()
@@ -186,12 +329,11 @@ class HardwareGauntletGUI:
         # -------------------------------------------------------------
         # Header Toolbar
         # -------------------------------------------------------------
-        header = tk.Frame(root, padx=22, pady=14, highlightthickness=1)
+        header = tk.Frame(root, padx=24, pady=16, highlightthickness=1)
         header.pack(fill=tk.X, side=tk.TOP)
         themed_widgets["surface"].append(header)
         themed_widgets["borders"].append(header)
 
-        # Logo and Title Left
         title_box = tk.Frame(header)
         title_box.pack(side=tk.LEFT)
         themed_widgets["surface"].append(title_box)
@@ -208,66 +350,34 @@ class HardwareGauntletGUI:
         title_row.pack(anchor="w")
         themed_widgets["surface"].append(title_row)
 
-        lbl_main_title = tk.Label(title_row, text="HARDWARE GAUNTLET", font=("Segoe UI", 15, "bold"))
+        lbl_main_title = tk.Label(title_row, text="YOUR SYSTEM — HARDWARE GAUNTLET", font=("Segoe UI", 14, "bold"))
         lbl_main_title.pack(side=tk.LEFT)
         themed_widgets["surface"].append(lbl_main_title)
         themed_widgets["text_primary"].append(lbl_main_title)
 
-        lbl_tag = tk.Label(title_row, text="v1.0.0 • Local Engine", font=("Segoe UI", 8, "bold"), padx=6, pady=1)
+        lbl_tag = tk.Label(title_row, text="v1.0.0 • Pure Local", font=("Segoe UI", 8, "bold"), padx=6, pady=1)
         lbl_tag.pack(side=tk.LEFT, padx=(10, 0))
         themed_widgets["card_alts"].append(lbl_tag)
         themed_widgets["text_dim"].append(lbl_tag)
 
-        lbl_subtitle = tk.Label(title_text_box, text="Ready to audit hardware. Click '▶ Run Full Scan' to analyze all subsystems.", font=("Segoe UI", 9))
+        lbl_subtitle = tk.Label(title_text_box, text="System Standby — Click '▶ Run Full Scan' to audit hardware parameters.", font=("Segoe UI", 9))
         lbl_subtitle.pack(anchor="w", pady=(2, 0))
         themed_widgets["surface"].append(lbl_subtitle)
         themed_widgets["text_dim"].append(lbl_subtitle)
 
-        # Action Buttons Right
+        # Header Action Pill Buttons
         btn_frame = tk.Frame(header)
         btn_frame.pack(side=tk.RIGHT)
         themed_widgets["surface"].append(btn_frame)
 
-        # Health Score Card
-        score_val = tk.StringVar(value="--")
-        score_rating = tk.StringVar(value="READY")
-
-        score_card = tk.Frame(btn_frame, padx=14, pady=5, highlightthickness=1)
-        score_card.pack(side=tk.LEFT, padx=(0, 12))
-        themed_widgets["cards"].append(score_card)
-        themed_widgets["borders"].append(score_card)
-
-        score_inner = tk.Frame(score_card)
-        score_inner.pack()
-        themed_widgets["cards"].append(score_inner)
-
-        lbl_score_num = tk.Label(score_inner, textvariable=score_val, font=("Segoe UI", 16, "bold"))
-        lbl_score_num.pack(side=tk.LEFT, padx=(0, 8))
-        themed_widgets["cards"].append(lbl_score_num)
-        themed_widgets["text_primary"].append(lbl_score_num)
-
-        score_meta = tk.Frame(score_inner)
-        score_meta.pack(side=tk.LEFT)
-        themed_widgets["cards"].append(score_meta)
-
-        lbl_score_title = tk.Label(score_meta, text="HEALTH SCORE", font=("Segoe UI", 7, "bold"))
-        lbl_score_title.pack(anchor="w")
-        themed_widgets["cards"].append(lbl_score_title)
-        themed_widgets["text_dim"].append(lbl_score_title)
-
-        lbl_score_chip = tk.Label(score_meta, textvariable=score_rating, font=("Segoe UI", 8, "bold"))
-        lbl_score_chip.pack(anchor="w")
-        themed_widgets["cards"].append(lbl_score_chip)
-        themed_widgets["text_primary"].append(lbl_score_chip)
-
-        # Callbacks
         def do_scan():
             if self._is_scanning:
                 return
             self._is_scanning = True
             btn_scan.config(state=tk.DISABLED, text="⏳ Scanning...")
             btn_overview_scan.config(state=tk.DISABLED, text="⏳ Scanning...")
-            lbl_subtitle.config(text="Auditing CPU, memory modules, GPU, storage drives, and security firmware...")
+            dial_health.update_value("...", 30.0, "AUDITING")
+            lbl_subtitle.config(text="Auditing processor architecture, DIMM memory modules, GPU, storage arrays, and UEFI security...")
             threading.Thread(target=run_background_scan, daemon=True).start()
 
         def do_export_html():
@@ -304,7 +414,7 @@ class HardwareGauntletGUI:
                 def on_done():
                     btn_install.config(state=tk.NORMAL, text="✓ Installed" if success else "📦 Install to PC")
                     if success:
-                        lbl_install_status.config(text=f"Status: Installed in {get_install_directory()}")
+                        lbl_install_status.config(text=f"Status: Installed at {get_install_directory()}")
                         messagebox.showinfo("Installation Complete", f"{msg}\n\n• Start Menu shortcut created\n• Desktop shortcut created\n• CLI command 'hwscan' added to PATH\n• Visible in Windows Settings > Installed Apps")
                     else:
                         messagebox.showerror("Installation Error", msg)
@@ -321,7 +431,6 @@ class HardwareGauntletGUI:
             except Exception as err:
                 messagebox.showerror("Tool Error", f"Unable to launch {tool_cmd}:\n{err}")
 
-        # Header Buttons
         btn_scan = tk.Button(btn_frame, text="▶ Run Full Scan", command=do_scan, font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1)
         btn_scan.pack(side=tk.LEFT, padx=3)
         themed_widgets["btn_primary"].append(btn_scan)
@@ -346,10 +455,10 @@ class HardwareGauntletGUI:
         # Main Tab Navigation
         # -------------------------------------------------------------
         notebook = ttk.Notebook(root)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=18, pady=(10, 16))
+        notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(10, 18))
 
         def create_tab(title):
-            tab = tk.Frame(notebook, padx=16, pady=16)
+            tab = tk.Frame(notebook, padx=18, pady=16)
             notebook.add(tab, text=title)
             themed_widgets["root_bg"].append(tab)
             return tab
@@ -364,63 +473,83 @@ class HardwareGauntletGUI:
         tab_tools = create_tab("🛠️ Diagnostics & Install")
 
         # -------------------------------------------------------------
-        # Tab 1: Overview & Modern KPI Tiles
+        # Tab 1: Overview with Circular Dial & System Cards
         # -------------------------------------------------------------
-        banner_frame = tk.Frame(tab_overview, padx=18, pady=12, highlightthickness=1)
-        banner_frame.pack(fill=tk.X, pady=(0, 14))
-        themed_widgets["surface"].append(banner_frame)
-        themed_widgets["borders"].append(banner_frame)
+        overview_top = tk.Frame(tab_overview)
+        overview_top.pack(fill=tk.X, pady=(0, 14))
+        themed_widgets["root_bg"].append(overview_top)
 
-        banner_inner = tk.Frame(banner_frame)
-        banner_inner.pack(fill=tk.X)
-        themed_widgets["surface"].append(banner_inner)
+        # Featured Card 01: Thermostat Radial Dial for Health Score
+        card_dial = tk.Frame(overview_top, width=280, padx=20, pady=16, highlightthickness=1)
+        card_dial.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 14))
+        themed_widgets["cards"].append(card_dial)
+        themed_widgets["borders"].append(card_dial)
 
-        lbl_banner_title = tk.Label(banner_inner, text="SYSTEM READY FOR HARDWARE AUDIT", font=("Segoe UI", 11, "bold"))
-        lbl_banner_title.pack(anchor="w")
-        themed_widgets["surface"].append(lbl_banner_title)
-        themed_widgets["text_primary"].append(lbl_banner_title)
+        lbl_dial_card_title = tk.Label(card_dial, text="CARD 01 — SYSTEM HEALTH", font=("Segoe UI", 9, "bold"))
+        lbl_dial_card_title.pack(anchor="w")
+        themed_widgets["cards"].append(lbl_dial_card_title)
+        themed_widgets["text_primary"].append(lbl_dial_card_title)
 
-        lbl_banner_desc = tk.Label(banner_inner, text="Hardware Gauntlet audits CPU architecture, physical DIMM sockets, GPU controllers, NVMe/SATA health, and UEFI security parameters.", font=("Segoe UI", 9))
-        lbl_banner_desc.pack(anchor="w", pady=(2, 6))
-        themed_widgets["surface"].append(lbl_banner_desc)
-        themed_widgets["text_dim"].append(lbl_banner_desc)
+        lbl_dial_card_sub = tk.Label(card_dial, text="Real-time hardware integrity rating", font=("Segoe UI", 8))
+        lbl_dial_card_sub.pack(anchor="w", pady=(1, 10))
+        themed_widgets["cards"].append(lbl_dial_card_sub)
+        themed_widgets["text_dim"].append(lbl_dial_card_sub)
 
-        btn_overview_scan = tk.Button(banner_inner, text="▶ Run Full Scan Now", command=do_scan, font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=14, pady=5, cursor="hand2", highlightthickness=1)
-        btn_overview_scan.pack(anchor="w")
+        dial_health = RadialDialWidget(card_dial, size=180, title="HEALTH SCORE", value_str="--", sub_str="READY", percent=0.0)
+        dial_health.pack(pady=4)
+        themed_widgets["dials"].append((dial_health, "cards"))
+
+        dial_btn_row = tk.Frame(card_dial)
+        dial_btn_row.pack(fill=tk.X, pady=(12, 0))
+        themed_widgets["cards"].append(dial_btn_row)
+
+        btn_overview_scan = tk.Button(dial_btn_row, text="▶ Run Scan", command=do_scan, font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=10, pady=5, cursor="hand2", highlightthickness=1)
+        btn_overview_scan.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 4))
         themed_widgets["btn_primary"].append(btn_overview_scan)
 
-        kpi_grid = tk.Frame(tab_overview)
-        kpi_grid.pack(fill=tk.X, pady=(0, 14))
-        themed_widgets["root_bg"].append(kpi_grid)
+        btn_overview_export = tk.Button(dial_btn_row, text="📄 Report", command=do_export_html, font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=10, pady=5, cursor="hand2", highlightthickness=1)
+        btn_overview_export.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
+        themed_widgets["btn_secondary"].append(btn_overview_export)
 
-        def create_kpi_card(parent, title):
+        # Right 4 System Architecture Cards
+        overview_cards_grid = tk.Frame(overview_top)
+        overview_cards_grid.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        themed_widgets["root_bg"].append(overview_cards_grid)
+
+        def create_metric_card(parent, card_num, title, row, col):
             card = tk.Frame(parent, padx=16, pady=12, highlightthickness=1)
-            card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-            themed_widgets["surface"].append(card)
+            card.grid(row=row, column=col, sticky="nsew", padx=4, pady=4)
+            themed_widgets["cards"].append(card)
             themed_widgets["borders"].append(card)
 
-            lbl_t = tk.Label(card, text=title.upper(), font=("Segoe UI", 8, "bold"))
-            lbl_t.pack(anchor="w")
-            themed_widgets["surface"].append(lbl_t)
-            themed_widgets["text_dim"].append(lbl_t)
+            lbl_hdr = tk.Label(card, text=f"{card_num} — {title.upper()}", font=("Segoe UI", 8, "bold"))
+            lbl_hdr.pack(anchor="w")
+            themed_widgets["cards"].append(lbl_hdr)
+            themed_widgets["text_dim"].append(lbl_hdr)
 
-            lbl_v = tk.Label(card, text="Click 'Run Scan'", font=("Segoe UI", 11, "bold"))
-            lbl_v.pack(anchor="w", pady=(3, 2))
-            themed_widgets["surface"].append(lbl_v)
+            lbl_v = tk.Label(card, text="Click 'Run Scan'", font=("Segoe UI", 12, "bold"))
+            lbl_v.pack(anchor="w", pady=(4, 2))
+            themed_widgets["cards"].append(lbl_v)
             themed_widgets["text_primary"].append(lbl_v)
 
             lbl_s = tk.Label(card, text="Awaiting trigger", font=("Segoe UI", 8))
             lbl_s.pack(anchor="w")
-            themed_widgets["surface"].append(lbl_s)
+            themed_widgets["cards"].append(lbl_s)
             themed_widgets["text_dim"].append(lbl_s)
             return lbl_v, lbl_s
 
-        kpi_cpu_v, kpi_cpu_s = create_kpi_card(kpi_grid, "Processor (CPU)")
-        kpi_mem_v, kpi_mem_s = create_kpi_card(kpi_grid, "Memory (RAM)")
-        kpi_gpu_v, kpi_gpu_s = create_kpi_card(kpi_grid, "Graphics (GPU)")
-        kpi_sec_v, kpi_sec_s = create_kpi_card(kpi_grid, "Security & Boot")
+        overview_cards_grid.columnconfigure(0, weight=1)
+        overview_cards_grid.columnconfigure(1, weight=1)
+        overview_cards_grid.rowconfigure(0, weight=1)
+        overview_cards_grid.rowconfigure(1, weight=1)
 
-        lbl_findings_hdr = tk.Label(tab_overview, text="HARDWARE DIAGNOSTIC FINDINGS & ALERTS", font=("Segoe UI", 10, "bold"))
+        kpi_cpu_v, kpi_cpu_s = create_metric_card(overview_cards_grid, "CARD 02", "Processor Architecture", 0, 0)
+        kpi_mem_v, kpi_mem_s = create_metric_card(overview_cards_grid, "CARD 03", "Memory DIMM Topology", 0, 1)
+        kpi_gpu_v, kpi_gpu_s = create_metric_card(overview_cards_grid, "CARD 04", "Graphics Accelerator", 1, 0)
+        kpi_sec_v, kpi_sec_s = create_metric_card(overview_cards_grid, "CARD 05", "Firmware & Security", 1, 1)
+
+        # Bottom Findings Treeview
+        lbl_findings_hdr = tk.Label(tab_overview, text="HARDWARE AUDIT FINDINGS & ALERTS —", font=("Segoe UI", 10, "bold"))
         lbl_findings_hdr.pack(anchor="w", pady=(4, 6))
         themed_widgets["root_bg"].append(lbl_findings_hdr)
         themed_widgets["text_primary"].append(lbl_findings_hdr)
@@ -431,121 +560,153 @@ class HardwareGauntletGUI:
         tree_warn.heading("details", text="Observation & Recommendation")
         tree_warn.column("level", width=110, anchor="center")
         tree_warn.column("category", width=140)
-        tree_warn.column("details", width=740)
+        tree_warn.column("details", width=760)
         tree_warn.pack(fill=tk.BOTH, expand=True)
         themed_widgets["treeviews"].append(tree_warn)
-
         tree_warn.insert("", tk.END, values=("READY", "Scanner", "System audit ready. Click '▶ Run Full Scan' in the toolbar to begin analysis."), tags=("even",))
 
         # -------------------------------------------------------------
-        # Tab 2: 🔥 Stress Test & Thermal Stability
+        # Tab 2: 🔥 Stress Test with Dual Thermostat Dials & Pill Toggles
         # -------------------------------------------------------------
-        stress_ctrl_box = tk.Frame(tab_stress, padx=18, pady=12, highlightthickness=1)
-        stress_ctrl_box.pack(fill=tk.X, pady=(0, 12))
-        themed_widgets["surface"].append(stress_ctrl_box)
-        themed_widgets["borders"].append(stress_ctrl_box)
+        stress_top = tk.Frame(tab_stress)
+        stress_top.pack(fill=tk.X, pady=(0, 12))
+        themed_widgets["root_bg"].append(stress_top)
 
-        lbl_stress_hdr = tk.Label(stress_ctrl_box, text="HARDWARE TORTURE & STABILITY BENCHMARK", font=("Segoe UI", 11, "bold"))
-        lbl_stress_hdr.pack(anchor="w")
-        themed_widgets["surface"].append(lbl_stress_hdr)
-        themed_widgets["text_primary"].append(lbl_stress_hdr)
+        # Dial 1: Thermal Dial (matching exact 26°C thermostat from image)
+        card_thermal_dial = tk.Frame(stress_top, width=240, padx=16, pady=14, highlightthickness=1)
+        card_thermal_dial.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
+        themed_widgets["cards"].append(card_thermal_dial)
+        themed_widgets["borders"].append(card_thermal_dial)
 
-        lbl_stress_sub = tk.Label(stress_ctrl_box, text="Stress-tests multi-core CPU mathematical load, RAM bit-pattern integrity, sequential disk throughput, and thermal throttling.", font=("Segoe UI", 8))
-        lbl_stress_sub.pack(anchor="w", pady=(1, 10))
-        themed_widgets["surface"].append(lbl_stress_sub)
-        themed_widgets["text_dim"].append(lbl_stress_sub)
+        lbl_td_title = tk.Label(card_thermal_dial, text="THERMAL DIAL —", font=("Segoe UI", 9, "bold"))
+        lbl_td_title.pack(anchor="w")
+        themed_widgets["cards"].append(lbl_td_title)
+        themed_widgets["text_primary"].append(lbl_td_title)
 
-        stress_opt_row = tk.Frame(stress_ctrl_box)
-        stress_opt_row.pack(fill=tk.X)
-        themed_widgets["surface"].append(stress_opt_row)
+        dial_thermal = RadialDialWidget(card_thermal_dial, size=160, title="TEMP", value_str="--", unit="°C", sub_str="IDLE", percent=0.0)
+        dial_thermal.pack(pady=4)
+        themed_widgets["dials"].append((dial_thermal, "cards"))
+
+        # Dial 2: CPU Load Dial
+        card_cpu_dial = tk.Frame(stress_top, width=240, padx=16, pady=14, highlightthickness=1)
+        card_cpu_dial.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 12))
+        themed_widgets["cards"].append(card_cpu_dial)
+        themed_widgets["borders"].append(card_cpu_dial)
+
+        lbl_cd_title = tk.Label(card_cpu_dial, text="CPU TORTURE —", font=("Segoe UI", 9, "bold"))
+        lbl_cd_title.pack(anchor="w")
+        themed_widgets["cards"].append(lbl_cd_title)
+        themed_widgets["text_primary"].append(lbl_cd_title)
+
+        dial_cpu = RadialDialWidget(card_cpu_dial, size=160, title="LOAD", value_str="0.0", unit="%", sub_str="READY", percent=0.0)
+        dial_cpu.pack(pady=4)
+        themed_widgets["dials"].append((dial_cpu, "cards"))
+
+        # Controls & Pill Switches Card (matching 'ROOM LAMP', 'ROOM OUTLET' design)
+        card_controls = tk.Frame(stress_top, padx=18, pady=14, highlightthickness=1)
+        card_controls.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        themed_widgets["cards"].append(card_controls)
+        themed_widgets["borders"].append(card_controls)
+
+        lbl_ctrl_title = tk.Label(card_controls, text="SUBSYSTEM CONTROLS —", font=("Segoe UI", 9, "bold"))
+        lbl_ctrl_title.pack(anchor="w")
+        themed_widgets["cards"].append(lbl_ctrl_title)
+        themed_widgets["text_primary"].append(lbl_ctrl_title)
+
+        lbl_ctrl_desc = tk.Label(card_controls, text="Toggle targeted subsystems for heavy torture benchmarking", font=("Segoe UI", 8))
+        lbl_ctrl_desc.pack(anchor="w", pady=(1, 10))
+        themed_widgets["cards"].append(lbl_ctrl_desc)
+        themed_widgets["text_dim"].append(lbl_ctrl_desc)
 
         var_test_cpu = tk.BooleanVar(value=True)
         var_test_ram = tk.BooleanVar(value=True)
         var_test_disk = tk.BooleanVar(value=True)
 
-        chk_cpu = tk.Checkbutton(stress_opt_row, text="CPU Multi-Core", variable=var_test_cpu, font=("Segoe UI", 9, "bold"), cursor="hand2")
-        chk_cpu.pack(side=tk.LEFT, padx=(0, 14))
-        themed_widgets["surface"].append(chk_cpu)
-        themed_widgets["text_primary"].append(chk_cpu)
+        def add_pill_switch_row(parent, icon, title, desc, var):
+            row = tk.Frame(parent, pady=3)
+            row.pack(fill=tk.X)
+            themed_widgets["cards"].append(row)
 
-        chk_ram = tk.Checkbutton(stress_opt_row, text="RAM Bit Integrity", variable=var_test_ram, font=("Segoe UI", 9, "bold"), cursor="hand2")
-        chk_ram.pack(side=tk.LEFT, padx=(0, 14))
-        themed_widgets["surface"].append(chk_ram)
-        themed_widgets["text_primary"].append(chk_ram)
+            txt_box = tk.Frame(row)
+            txt_box.pack(side=tk.LEFT, anchor="w")
+            themed_widgets["cards"].append(txt_box)
 
-        chk_disk = tk.Checkbutton(stress_opt_row, text="Disk Sequential I/O", variable=var_test_disk, font=("Segoe UI", 9, "bold"), cursor="hand2")
-        chk_disk.pack(side=tk.LEFT, padx=(0, 20))
-        themed_widgets["surface"].append(chk_disk)
-        themed_widgets["text_primary"].append(chk_disk)
+            t = tk.Label(txt_box, text=f"{icon} {title.upper()}", font=("Segoe UI", 9, "bold"))
+            t.pack(anchor="w")
+            themed_widgets["cards"].append(t)
+            themed_widgets["text_primary"].append(t)
 
-        tk.Label(stress_opt_row, text="Duration:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT, padx=(0, 6))
-        themed_widgets["surface"].append(stress_opt_row.winfo_children()[-1])
-        themed_widgets["text_dim"].append(stress_opt_row.winfo_children()[-1])
+            d = tk.Label(txt_box, text=desc, font=("Segoe UI", 7))
+            d.pack(anchor="w")
+            themed_widgets["cards"].append(d)
+            themed_widgets["text_dim"].append(d)
 
-        combo_duration = ttk.Combobox(stress_opt_row, values=["15 Seconds (Quick)", "30 Seconds (Standard)", "60 Seconds (Heavy)", "120 Seconds (Torture)"], state="readonly", width=22)
+            def on_toggle(state):
+                var.set(state)
+
+            toggle = PillToggle(row, initial=var.get(), on_toggle=on_toggle)
+            toggle.pack(side=tk.RIGHT, padx=6)
+            themed_widgets["pill_toggles"].append((toggle, "cards"))
+            return toggle
+
+        add_pill_switch_row(card_controls, "🧠", "CPU Multi-Core Torture", "Math, trigonometry & SHA-256 on all logical cores", var_test_cpu)
+        add_pill_switch_row(card_controls, "💾", "RAM Bit-Flip Integrity", "Allocates 1GB pattern buffers (0xAA, 0x55) to catch memory decay", var_test_ram)
+        add_pill_switch_row(card_controls, "💽", "Disk Sequential I/O", "Benchmarks sustained sequential write and read speeds (MB/s)", var_test_disk)
+
+        # Duration & Execution buttons row (matching [ POWER ] [ MODE ] [ START ])
+        stress_act_row = tk.Frame(card_controls, pady=8)
+        stress_act_row.pack(fill=tk.X, pady=(6, 0))
+        themed_widgets["cards"].append(stress_act_row)
+
+        tk.Label(stress_act_row, text="DURATION:", font=("Segoe UI", 8, "bold")).pack(side=tk.LEFT, padx=(0, 6))
+        themed_widgets["cards"].append(stress_act_row.winfo_children()[-1])
+        themed_widgets["text_dim"].append(stress_act_row.winfo_children()[-1])
+
+        combo_duration = ttk.Combobox(stress_act_row, values=["15s (Quick Check)", "30s (Standard Run)", "60s (Heavy Torture)", "120s (Burn-in)"], state="readonly", width=18)
         combo_duration.current(1)
-        combo_duration.pack(side=tk.LEFT, padx=(0, 20))
+        combo_duration.pack(side=tk.LEFT, padx=(0, 14))
 
-        btn_start_stress = tk.Button(stress_opt_row, text="▶ Start Stress Test", font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=16, pady=5, cursor="hand2", highlightthickness=1)
-        btn_start_stress.pack(side=tk.LEFT, padx=(0, 8))
+        btn_start_stress = tk.Button(stress_act_row, text="▶ Start Torture", font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=14, pady=5, cursor="hand2", highlightthickness=1)
+        btn_start_stress.pack(side=tk.LEFT, padx=(0, 6))
         themed_widgets["btn_primary"].append(btn_start_stress)
 
-        btn_stop_stress = tk.Button(stress_opt_row, text="⏹ Stop", font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=12, pady=5, cursor="hand2", state=tk.DISABLED, highlightthickness=1)
+        btn_stop_stress = tk.Button(stress_act_row, text="⏹ Stop", font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=12, pady=5, cursor="hand2", state=tk.DISABLED, highlightthickness=1)
         btn_stop_stress.pack(side=tk.LEFT)
         themed_widgets["btn_secondary"].append(btn_stop_stress)
 
-        # Stress Telemetry Cards
-        stress_grid = tk.Frame(tab_stress)
-        stress_grid.pack(fill=tk.X, pady=(0, 12))
-        themed_widgets["root_bg"].append(stress_grid)
-
-        tile_cpu_v, tile_cpu_s = create_kpi_card(stress_grid, "CPU Utilization")
-        tile_temp_v, tile_temp_s = create_kpi_card(stress_grid, "Thermal & GPU Temp")
-        tile_ram_v, tile_ram_s = create_kpi_card(stress_grid, "RAM Integrity")
-        tile_disk_v, tile_disk_s = create_kpi_card(stress_grid, "Disk Throughput")
-
-        tile_cpu_v.config(text="0.0%")
-        tile_cpu_s.config(text="All Cores Ready")
-        tile_temp_v.config(text="-- °C")
-        tile_temp_s.config(text="nvidia-smi / WMI")
-        tile_ram_v.config(text="0 Errors")
-        tile_ram_s.config(text="0 MB Allocated")
-        tile_disk_v.config(text="Idle")
-        tile_disk_s.config(text="W: -- | R: --")
-
         # Progress bar
         stress_progress_frame = tk.Frame(tab_stress)
-        stress_progress_frame.pack(fill=tk.X, pady=(0, 10))
+        stress_progress_frame.pack(fill=tk.X, pady=(0, 8))
         themed_widgets["root_bg"].append(stress_progress_frame)
 
         stress_progress = ttk.Progressbar(stress_progress_frame, mode="determinate", length=600)
         stress_progress.pack(fill=tk.X)
 
-        lbl_stress_status = tk.Label(stress_progress_frame, text="Status: Ready to benchmark. Select duration and click 'Start Stress Test'.", font=("Segoe UI", 9))
+        lbl_stress_status = tk.Label(stress_progress_frame, text="Status: Ready to benchmark. Select duration and click '▶ Start Torture'.", font=("Segoe UI", 9))
         lbl_stress_status.pack(anchor="w", pady=(3, 0))
         themed_widgets["root_bg"].append(lbl_stress_status)
         themed_widgets["text_dim"].append(lbl_stress_status)
 
-        # Split Bottom: Live Diagnostic Output Console + Native Windows Benchmarks
+        # Bottom Split: Live Diagnostics Console & Windows Benchmarks
         stress_bottom = tk.Frame(tab_stress)
         stress_bottom.pack(fill=tk.BOTH, expand=True)
         themed_widgets["root_bg"].append(stress_bottom)
 
         console_frame = tk.Frame(stress_bottom, highlightthickness=1)
-        console_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
+        console_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         themed_widgets["surface"].append(console_frame)
         themed_widgets["borders"].append(console_frame)
 
-        console_title_bar = tk.Frame(console_frame, padx=10, pady=4)
+        console_title_bar = tk.Frame(console_frame, padx=12, pady=6)
         console_title_bar.pack(fill=tk.X)
         themed_widgets["surface"].append(console_title_bar)
 
-        lbl_console_title = tk.Label(console_title_bar, text="REAL-TIME DIAGNOSTIC TELEMETRY LOG", font=("Segoe UI", 8, "bold"))
+        lbl_console_title = tk.Label(console_title_bar, text="REAL-TIME DIAGNOSTIC CONSOLE —", font=("Segoe UI", 8, "bold"))
         lbl_console_title.pack(side=tk.LEFT)
         themed_widgets["surface"].append(lbl_console_title)
         themed_widgets["text_dim"].append(lbl_console_title)
 
-        txt_console = tk.Text(console_frame, font=("Consolas", 9), relief=tk.FLAT, padx=10, pady=8, height=8)
+        txt_console = tk.Text(console_frame, font=("Consolas", 9), relief=tk.FLAT, padx=12, pady=8, height=8)
         txt_console.pack(fill=tk.BOTH, expand=True)
         themed_widgets["consoles"].append(txt_console)
 
@@ -554,16 +715,16 @@ class HardwareGauntletGUI:
             txt_console.insert(tk.END, f"[{timestamp}] {msg}\n")
             txt_console.see(tk.END)
 
-        log_console("Hardware Gauntlet Stress Engine initialized.")
-        log_console("Ready to stress test multi-core CPU, RAM bit patterns, and disk throughput.")
+        log_console("Hardware Gauntlet Torture Engine online.")
+        log_console("Multi-core CPU mathematical torture, RAM pattern integrity, and thermal telemetry active.")
 
-        # Windows Native Diagnostic Tools Panel
-        win_tools_box = tk.Frame(stress_bottom, width=280, padx=12, pady=10, highlightthickness=1)
+        # Windows Tools Box
+        win_tools_box = tk.Frame(stress_bottom, width=280, padx=14, pady=12, highlightthickness=1)
         win_tools_box.pack(side=tk.RIGHT, fill=tk.Y)
         themed_widgets["surface"].append(win_tools_box)
         themed_widgets["borders"].append(win_tools_box)
 
-        lbl_win_bench = tk.Label(win_tools_box, text="WINDOWS DIAGNOSTICS", font=("Segoe UI", 9, "bold"))
+        lbl_win_bench = tk.Label(win_tools_box, text="WINDOWS BENCHMARKS —", font=("Segoe UI", 9, "bold"))
         lbl_win_bench.pack(anchor="w", pady=(0, 8))
         themed_widgets["surface"].append(lbl_win_bench)
         themed_widgets["text_primary"].append(lbl_win_bench)
@@ -577,7 +738,7 @@ class HardwareGauntletGUI:
             themed_widgets["btn_secondary"].append(b)
 
         if sys.platform == "win32":
-            add_quick_tool("🧠 Windows Memory Check", "Schedule boot RAM test", "mdsched.exe")
+            add_quick_tool("🧠 Windows Memory Check", "Schedule deep BIOS RAM test", "mdsched.exe")
             add_quick_tool("📈 System Performance", "Generate 60s perf report", "perfmon.exe /report")
             add_quick_tool("⚡ WinSAT Assessment", "Windows assessment tool", "winsat.exe formal")
             add_quick_tool("🎮 DirectX Diagnostic", "DirectX & display driver check", "dxdiag.exe")
@@ -594,28 +755,16 @@ class HardwareGauntletGUI:
                 stress_progress["value"] = progress
 
                 cpu_pct = t.get("cpu_percent", 0.0)
-                tile_cpu_v.config(text=f"{cpu_pct:.1f}%")
                 freq = t.get("cpu_freq_mhz", 0.0)
-                tile_cpu_s.config(text=f"Freq: {freq/1000:.2f} GHz | Peak: {t.get('peak_cpu_load', 0):.1f}%")
+                dial_cpu.update_value(f"{cpu_pct:.0f}", cpu_pct, f"{freq/1000:.1f} GHz" if freq > 0 else "ACTIVE")
 
                 gpu_temp = t.get("gpu_temp")
                 if gpu_temp is not None:
-                    tile_temp_v.config(text=f"{gpu_temp} °C")
-                    peak_temp = t.get("peak_gpu_temp", gpu_temp)
-                    tile_temp_s.config(text=f"Peak: {peak_temp} °C | Status: Nominal")
+                    t_pct = min(100.0, (gpu_temp / 100.0) * 100.0)
+                    status_str = "NOMINAL" if gpu_temp < 75 else ("WARM" if gpu_temp < 85 else "CRITICAL")
+                    dial_thermal.update_value(str(gpu_temp), t_pct, status_str)
                 else:
-                    tile_temp_v.config(text="Active")
-                    tile_temp_s.config(text="Thermal zones normal")
-
-                ram_err = t.get("ram_errors", 0)
-                tile_ram_v.config(text=f"{ram_err} Errors" if ram_err == 0 else f"⚠️ {ram_err} FAULTS")
-                tile_ram_s.config(text=f"RAM: {t.get('ram_percent', 0)}% used")
-
-                w_spd = t.get("disk_write_speed", 0.0)
-                r_spd = t.get("disk_read_speed", 0.0)
-                if w_spd > 0 or r_spd > 0:
-                    tile_disk_v.config(text=f"W: {w_spd:.0f} MB/s")
-                    tile_disk_s.config(text=f"R: {r_spd:.0f} MB/s")
+                    dial_thermal.update_value("NORM", progress, "PASS")
 
                 lbl_stress_status.config(text=f"Status: Stress testing in progress... Elapsed: {t.get('elapsed', 0)}s / {t.get('duration', 30)}s ({progress:.0f}%)")
             root.after(0, update)
@@ -627,13 +776,14 @@ class HardwareGauntletGUI:
                 btn_stop_stress.config(state=tk.DISABLED)
 
                 verdict = summary.get("stability_status", "PASSED")
+                dial_cpu.update_value("0.0", 0.0, "COMPLETE")
                 lbl_stress_status.config(text=f"Status: COMPLETED in {summary.get('total_elapsed', 0)}s • Verdict: {verdict}")
                 log_console(f"Torture benchmark finished. Verdict: {verdict}")
                 log_console(f"Peak CPU Load: {summary.get('peak_cpu_load', 0)}% | Peak GPU Temp: {summary.get('peak_gpu_temp', 'N/A')} °C")
                 log_console(f"RAM Integrity Errors: {summary.get('ram_errors', 0)}")
                 if summary.get("disk_write_speed", 0) > 0:
                     log_console(f"Disk Sequential Write: {summary.get('disk_write_speed')} MB/s | Read: {summary.get('disk_read_speed')} MB/s")
-                messagebox.showinfo("Stress Test Complete", f"Hardware Stress Benchmark Finished!\n\nVerdict: {verdict}\nPeak CPU Load: {summary.get('peak_cpu_load', 0)}%\nPeak GPU Temp: {summary.get('peak_gpu_temp', 'N/A')} °C\nRAM Bit Errors: {summary.get('ram_errors', 0)}")
+                messagebox.showinfo("Stress Test Complete", f"Hardware Torture Benchmark Finished!\n\nVerdict: {verdict}\nPeak CPU Load: {summary.get('peak_cpu_load', 0)}%\nPeak GPU Temp: {summary.get('peak_gpu_temp', 'N/A')} °C\nRAM Bit Errors: {summary.get('ram_errors', 0)}")
             root.after(0, update)
 
         def start_stress():
@@ -748,7 +898,7 @@ class HardwareGauntletGUI:
         # -------------------------------------------------------------
         # Tab 8: System Tools, Diagnostics & Installation
         # -------------------------------------------------------------
-        lbl_tools_hdr = tk.Label(tab_tools, text="DIRECT OPERATING SYSTEM DIAGNOSTIC SHORTCUTS", font=("Segoe UI", 11, "bold"))
+        lbl_tools_hdr = tk.Label(tab_tools, text="DIRECT OPERATING SYSTEM DIAGNOSTIC SHORTCUTS —", font=("Segoe UI", 11, "bold"))
         lbl_tools_hdr.pack(anchor="w", pady=(0, 14))
         themed_widgets["root_bg"].append(lbl_tools_hdr)
         themed_widgets["text_primary"].append(lbl_tools_hdr)
@@ -789,7 +939,7 @@ class HardwareGauntletGUI:
         themed_widgets["surface"].append(install_card)
         themed_widgets["borders"].append(install_card)
 
-        lbl_inst_title = tk.Label(install_card, text="SYSTEM INSTALLATION & SHORTCUT MANAGEMENT", font=("Segoe UI", 11, "bold"))
+        lbl_inst_title = tk.Label(install_card, text="CARD 06 — SYSTEM INSTALLATION & SHORTCUT MANAGEMENT", font=("Segoe UI", 11, "bold"))
         lbl_inst_title.pack(anchor="w")
         themed_widgets["surface"].append(lbl_inst_title)
         themed_widgets["text_primary"].append(lbl_inst_title)
@@ -955,6 +1105,31 @@ class HardwareGauntletGUI:
                 except Exception:
                     pass
 
+            for dial, container_key in themed_widgets["dials"]:
+                try:
+                    parent_bg = th[container_key] if container_key in th else th["card"]
+                    dial.set_theme(
+                        bg=parent_bg,
+                        active_color=th["dial_active"],
+                        inactive_color=th["dial_inactive"],
+                        text_color=th["text"],
+                        dim_color=th["text_dim"]
+                    )
+                except Exception:
+                    pass
+
+            for toggle, container_key in themed_widgets["pill_toggles"]:
+                try:
+                    parent_bg = th[container_key] if container_key in th else th["card"]
+                    toggle.set_theme(
+                        bg_parent=parent_bg,
+                        pill_bg_off=th["pill_bg"],
+                        pill_bg_on=th["pill_active"],
+                        knob_color_on=th["pill_knob"]
+                    )
+                except Exception:
+                    pass
+
             btn_theme.config(text=th["toggle_text"])
 
             logo_img = get_theme_logo(self.current_theme)
@@ -1014,22 +1189,13 @@ class HardwareGauntletGUI:
             self._is_scanning = False
             self.current_report = report
             score = report.health_score
-            score_val.set(str(score))
 
-            if score >= 90:
-                score_rating.set("EXCELLENT")
-            elif score >= 75:
-                score_rating.set("OPTIMAL")
-            elif score >= 60:
-                score_rating.set("ATTENTION")
-            else:
-                score_rating.set("CRITICAL")
+            status_text = "OPTIMAL" if score >= 85 else ("ATTENTION" if score >= 70 else "CRITICAL")
+            dial_health.update_value(str(score), float(score), status_text)
 
             lbl_subtitle.config(text=f"Host: {report.system.hostname} • OS: {report.system.os_name} ({report.system.os_arch}) • Uptime: {report.system.uptime_formatted}")
             btn_scan.config(state=tk.NORMAL, text="⟳ Re-Scan")
-            btn_overview_scan.config(state=tk.NORMAL, text="⟳ Re-Scan Hardware")
-            lbl_banner_title.config(text=f"SYSTEM AUDIT COMPLETED • SCORE {score}/100")
-            lbl_banner_desc.config(text=f"Audited {report.cpu.logical_cores} CPU threads, {format_bytes(report.memory.total_bytes)} memory, {len(report.gpu.devices)} GPU accelerator(s), and {len(report.storage.partitions)} storage partitions.")
+            btn_overview_scan.config(state=tk.NORMAL, text="⟳ Re-Scan")
 
             # KPI values
             kpi_cpu_v.config(text=report.cpu.model[:24])
@@ -1121,8 +1287,6 @@ class HardwareGauntletGUI:
 
         # Apply initial dark theme
         apply_current_theme()
-
-        # NOTE: Scan is NOT automatically triggered on launch! User clicks '▶ Run Full Scan'
         root.mainloop()
 
 
