@@ -1,4 +1,4 @@
-"""Graphical Windows Setup Wizard for Hardware Gauntlet."""
+"""Graphical Windows Setup Wizard for Hardware Gauntlet styled with 100Days Design aesthetic."""
 
 import os
 import sys
@@ -9,11 +9,75 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 
+class PillButton(tk.Canvas):
+    """Pill-shaped capsule button matching 100Days design aesthetic."""
+
+    def __init__(self, parent, text="BUTTON", command=None, width=120, height=32, is_primary=True, font=("Segoe UI", 8, "bold"), **kwargs):
+        super().__init__(parent, width=width, height=height, highlightthickness=0, cursor="hand2", **kwargs)
+        self.text = text
+        self.command = command
+        self.w = width
+        self.h = height
+        self.is_primary = is_primary
+        self.btn_font = font
+        self.state = tk.NORMAL
+        self.fill_color = "#ffffff" if is_primary else "#18181b"
+        self.text_color = "#09090b" if is_primary else "#ffffff"
+        self.hover_color = "#e4e4e7" if is_primary else "#27272a"
+        self.border_color = "#ffffff" if is_primary else "#3f3f46"
+        self._is_hovered = False
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<Button-1>", self._on_click)
+        self.draw()
+
+    def set_text(self, new_text: str):
+        self.text = new_text
+        self.draw()
+
+    def _on_enter(self, e):
+        if self.state == tk.NORMAL:
+            self._is_hovered = True
+            self.draw()
+
+    def _on_leave(self, e):
+        self._is_hovered = False
+        self.draw()
+
+    def _on_click(self, e):
+        if self.state == tk.NORMAL and self.command:
+            self.command()
+
+    def draw(self):
+        self.delete("all")
+        rad = (self.h / 2.0) - 2
+        pts = [
+            rad + 2, 2,
+            self.w - rad - 2, 2,
+            self.w - 2, 2,
+            self.w - 2, 2 + rad,
+            self.w - 2, self.h - rad - 2,
+            self.w - 2, self.h - 2,
+            self.w - rad - 2, self.h - 2,
+            rad + 2, self.h - 2,
+            2, self.h - 2,
+            2, self.h - rad - 2,
+            2, 2 + rad,
+            2, 2
+        ]
+        col = self.hover_color if self._is_hovered else self.fill_color
+        if self.state == tk.DISABLED:
+            col = "#27272a"
+        self.create_polygon(pts, smooth=True, fill=col, outline=self.border_color if not self.is_primary else "", width=1)
+        txt_col = self.text_color if self.state == tk.NORMAL else "#71717a"
+        self.create_text(self.w / 2.0, self.h / 2.0, text=self.text, fill=txt_col, font=self.btn_font)
+
+
 class SetupWizard:
     def __init__(self, root):
         self.root = root
         self.root.title("Hardware Gauntlet Setup")
-        self.root.geometry("640x500")
+        self.root.geometry("640x520")
         self.root.resizable(False, False)
 
         # Base paths
@@ -28,20 +92,18 @@ class SetupWizard:
         self.var_path = tk.BooleanVar(value=True)
         self.var_launch = tk.BooleanVar(value=True)
 
-        # Dark stealth monochrome color palette
         self.BG = "#09090b"
-        self.SURFACE = "#121215"
-        self.CARD = "#18181b"
+        self.SURFACE = "#111114"
+        self.CARD = "#16161a"
         self.TEXT = "#ffffff"
         self.TEXT_DIM = "#a1a1aa"
-        self.BORDER = "#27272a"
-        self.BORDER_LIGHT = "#3f3f46"
+        self.BORDER = "#27272e"
+        self.BORDER_LIGHT = "#383842"
         self.ACCENT_WHITE = "#ffffff"
         self.ACCENT_SILVER = "#e4e4e7"
 
         self.root.configure(bg=self.BG)
 
-        # Set window icon
         ico_path = os.path.join(self.source_dir, "assets", "app.ico")
         if sys.platform == "win32" and os.path.exists(ico_path):
             try:
@@ -49,7 +111,6 @@ class SetupWizard:
             except Exception:
                 pass
 
-        # Container for pages
         self.container = tk.Frame(root, bg=self.BG)
         self.container.pack(fill=tk.BOTH, expand=True)
 
@@ -75,11 +136,9 @@ class SetupWizard:
     def show_welcome_page(self):
         self.clear_page()
 
-        # Header banner
         hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=18, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
 
-        # Header logo
         logo_path = os.path.join(self.source_dir, "assets", "logo_white_48.png")
         if not os.path.exists(logo_path):
             logo_path = os.path.join(self.source_dir, "assets", "logo_white.png")
@@ -92,24 +151,26 @@ class SetupWizard:
 
         hdr_text = tk.Frame(hdr, bg=self.SURFACE)
         hdr_text.pack(side=tk.LEFT)
-        tk.Label(hdr_text, text="YOUR SYSTEM — HARDWARE GAUNTLET", font=("Segoe UI", 15, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr_text, text="YOUR SYSTEM — HARDWARE GAUNTLET", font=("Segoe UI", 14, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
         tk.Label(hdr_text, text="Universal Native Diagnostic Suite • Pure Local & Offline", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=28, pady=20)
         body.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(body, text="How would you like to run Hardware Gauntlet?", font=("Segoe UI", 13, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(0, 14))
+        tk.Label(body, text="Select your execution preference:", font=("Segoe UI", 12, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(0, 14))
 
-        # Option 1: Run Portable (One-off instance)
+        # Option 1: Run Portable
         opt1_frame = tk.Frame(body, bg=self.CARD, padx=16, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
         opt1_frame.pack(fill=tk.X, pady=(0, 12))
 
         opt1_top = tk.Frame(opt1_frame, bg=self.CARD)
         opt1_top.pack(fill=tk.X)
-        tk.Label(opt1_top, text="⚡ Just Run (One-Off Portable Instance)", font=("Segoe UI", 11, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
-        tk.Button(opt1_top, text="Run Now 🚀", command=self.launch_portable, font=("Segoe UI", 9, "bold"), bg=self.ACCENT_WHITE, fg="#09090b", activebackground=self.ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=14, pady=4, cursor="hand2").pack(side=tk.RIGHT)
+        tk.Label(opt1_top, text="⚡ Just Run (One-Off Portable Instance)", font=("Segoe UI", 10, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
+        btn_run = PillButton(opt1_top, text="⚡ RUN NOW", command=self.launch_portable, width=100, height=28, is_primary=True)
+        btn_run.pack(side=tk.RIGHT)
+        btn_run.configure(bg=self.CARD)
 
-        tk.Label(opt1_frame, text="Runs immediately in-memory without installing files, modifying registry, or requiring administrator rights.", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(6, 0))
+        tk.Label(opt1_frame, text="Runs immediately in-memory without installing files, modifying registry, or requiring administrator rights.", font=("Segoe UI", 8), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(6, 0))
 
         # Option 2: Install as Application
         opt2_frame = tk.Frame(body, bg=self.CARD, padx=16, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
@@ -117,66 +178,86 @@ class SetupWizard:
 
         opt2_top = tk.Frame(opt2_frame, bg=self.CARD)
         opt2_top.pack(fill=tk.X)
-        tk.Label(opt2_top, text="📦 Install as Application (Permanent Setup)", font=("Segoe UI", 11, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
-        tk.Button(opt2_top, text="Install >", command=self.show_options_page, font=("Segoe UI", 9, "bold"), bg=self.CARD, fg=self.TEXT, activebackground=self.BORDER_LIGHT, activeforeground=self.TEXT, relief=tk.FLAT, padx=16, pady=4, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT)
+        tk.Label(opt2_top, text="📦 Install as Application (Permanent Setup)", font=("Segoe UI", 10, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
+        btn_inst = PillButton(opt2_top, text="INSTALL >", command=self.show_options_page, width=90, height=28, is_primary=False)
+        btn_inst.pack(side=tk.RIGHT)
+        btn_inst.configure(bg=self.CARD)
 
-        tk.Label(opt2_frame, text="Installs permanently to your device with Start Menu search, Desktop shortcut, and Windows Settings 'Installed apps' integration.", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(6, 0))
+        tk.Label(opt2_frame, text="Installs permanently to your device with Start Menu search, Desktop shortcut, and Windows Settings 'Installed apps' integration.", font=("Segoe UI", 8), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(6, 0))
 
         # Bottom nav
         footer = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
 
-        tk.Button(footer, text="Exit", command=self.root.destroy, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=16, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT, padx=4)
-        tk.Button(footer, text="⚡ Just Run Now", command=self.launch_portable, font=("Segoe UI", 9, "bold"), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.LEFT)
-        tk.Button(footer, text="Next: Install App >", command=self.show_options_page, font=("Segoe UI", 9, "bold"), bg=self.ACCENT_WHITE, fg="#09090b", activebackground=self.ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=16, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
+        btn_exit = PillButton(footer, text="EXIT", command=self.root.destroy, width=70, height=32, is_primary=False)
+        btn_exit.pack(side=tk.RIGHT, padx=4)
+        btn_exit.configure(bg=self.SURFACE)
+
+        btn_next = PillButton(footer, text="NEXT: INSTALL APP >", command=self.show_options_page, width=150, height=32, is_primary=True)
+        btn_next.pack(side=tk.RIGHT, padx=4)
+        btn_next.configure(bg=self.SURFACE)
+
+        btn_port = PillButton(footer, text="⚡ RUN PORTABLY", command=self.launch_portable, width=130, height=32, is_primary=False)
+        btn_port.pack(side=tk.LEFT)
+        btn_port.configure(bg=self.SURFACE)
 
     def show_options_page(self):
         self.clear_page()
 
         hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=16, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
-        tk.Label(hdr, text="CARD 02 — INSTALL LOCATION & SYSTEM OPTIONS", font=("Segoe UI", 13, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr, text="CARD 02 — INSTALL LOCATION & SYSTEM OPTIONS", font=("Segoe UI", 12, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=32, pady=20)
         body.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(body, text="Destination Folder:", font=("Segoe UI", 10, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w")
+        tk.Label(body, text="Destination Folder:", font=("Segoe UI", 9, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w")
         dir_frame = tk.Frame(body, bg=self.BG)
         dir_frame.pack(fill=tk.X, pady=(6, 16))
 
-        tk.Entry(dir_frame, textvariable=self.install_dir, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, insertbackground="#fff", relief=tk.FLAT, highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=5)
+        tk.Entry(dir_frame, textvariable=self.install_dir, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, insertbackground="#fff", relief=tk.FLAT, highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=4)
 
         def browse():
             d = filedialog.askdirectory(initialdir=self.install_dir.get())
             if d:
                 self.install_dir.set(d)
 
-        tk.Button(dir_frame, text="Browse...", command=browse, font=("Segoe UI", 8), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=10, pady=4, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT, padx=(8, 0))
+        btn_browse = PillButton(dir_frame, text="BROWSE...", command=browse, width=86, height=28, is_primary=False)
+        btn_browse.pack(side=tk.RIGHT, padx=(8, 0))
+        btn_browse.configure(bg=self.BG)
 
-        tk.Label(body, text="Integration Options:", font=("Segoe UI", 10, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(8, 6))
+        tk.Label(body, text="Integration Options:", font=("Segoe UI", 9, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(6, 4))
 
-        tk.Checkbutton(body, text="Create Desktop shortcut", variable=self.var_desktop, font=("Segoe UI", 9), fg=self.TEXT, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.TEXT).pack(anchor="w", pady=2)
-        tk.Checkbutton(body, text="Create Start Menu entry (Windows Search integration)", variable=self.var_startmenu, font=("Segoe UI", 9), fg=self.TEXT, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.TEXT).pack(anchor="w", pady=2)
-        tk.Checkbutton(body, text="Add hwscan to User PATH (command-line terminal access)", variable=self.var_path, font=("Segoe UI", 9), fg=self.TEXT, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.TEXT).pack(anchor="w", pady=2)
+        tk.Checkbutton(body, text="Create Desktop shortcut", variable=self.var_desktop, font=("Segoe UI", 8), fg=self.TEXT, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.TEXT).pack(anchor="w", pady=2)
+        tk.Checkbutton(body, text="Create Start Menu entry (Windows Search integration)", variable=self.var_startmenu, font=("Segoe UI", 8), fg=self.TEXT, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.TEXT).pack(anchor="w", pady=2)
+        tk.Checkbutton(body, text="Add hwscan to User PATH (command-line terminal access)", variable=self.var_path, font=("Segoe UI", 8), fg=self.TEXT, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.TEXT).pack(anchor="w", pady=2)
 
         footer = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
 
-        tk.Button(footer, text="Cancel", command=self.root.destroy, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT, padx=4)
-        tk.Button(footer, text="Install Now", command=self.start_installation, font=("Segoe UI", 9, "bold"), bg=self.ACCENT_WHITE, fg="#09090b", activebackground=self.ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=16, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
-        tk.Button(footer, text="< Back", command=self.show_welcome_page, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT, padx=4)
+        btn_can = PillButton(footer, text="CANCEL", command=self.root.destroy, width=78, height=32, is_primary=False)
+        btn_can.pack(side=tk.RIGHT, padx=4)
+        btn_can.configure(bg=self.SURFACE)
+
+        btn_go = PillButton(footer, text="INSTALL NOW", command=self.start_installation, width=120, height=32, is_primary=True)
+        btn_go.pack(side=tk.RIGHT, padx=4)
+        btn_go.configure(bg=self.SURFACE)
+
+        btn_back = PillButton(footer, text="< BACK", command=self.show_welcome_page, width=78, height=32, is_primary=False)
+        btn_back.pack(side=tk.RIGHT, padx=4)
+        btn_back.configure(bg=self.SURFACE)
 
     def start_installation(self):
         self.clear_page()
 
         hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=16, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
-        tk.Label(hdr, text="INSTALLATION IN PROGRESS —", font=("Segoe UI", 13, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr, text="INSTALLATION IN PROGRESS —", font=("Segoe UI", 12, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=32, pady=28)
         body.pack(fill=tk.BOTH, expand=True)
 
-        self.lbl_status = tk.Label(body, text="Preparing installation...", font=("Segoe UI", 10), fg=self.TEXT_DIM, bg=self.BG)
+        self.lbl_status = tk.Label(body, text="Preparing installation...", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.BG)
         self.lbl_status.pack(anchor="w", pady=(0, 12))
 
         self.progress = ttk.Progressbar(body, orient="horizontal", mode="determinate")
@@ -216,88 +297,68 @@ class SetupWizard:
 
             self.progress["value"] = 60
 
-            # Shortcuts and registry via powershell
             self.lbl_status.config(text="Configuring Windows Start Menu and Desktop shortcuts...")
-            ps_script = f"""
-            $WshShell = New-Object -ComObject WScript.Shell
-            $TargetExe = "{target}\\HardwareGauntlet.exe"
-            $IconFile = "{assets_dir}\\app.ico"
-
-            if ("{str(self.var_startmenu.get()).lower()}" -eq "true") {{
-                $StartLnk = "$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Hardware Gauntlet.lnk"
-                $s = $WshShell.CreateShortcut($StartLnk)
-                $s.TargetPath = $TargetExe
-                $s.WorkingDirectory = "{target}"
-                $s.Description = "Hardware Gauntlet - Hardware Diagnostic Suite"
-                if (Test-Path $IconFile) {{ $s.IconLocation = "$IconFile,0" }}
-                $s.Save()
-            }}
-
-            if ("{str(self.var_desktop.get()).lower()}" -eq "true") {{
-                $DesktopLnk = [System.IO.Path]::Combine([Environment]::GetFolderPath("Desktop"), "Hardware Gauntlet.lnk")
-                $d = $WshShell.CreateShortcut($DesktopLnk)
-                $d.TargetPath = $TargetExe
-                $d.WorkingDirectory = "{target}"
-                $d.Description = "Hardware Gauntlet - Hardware Diagnostic Suite"
-                if (Test-Path $IconFile) {{ $d.IconLocation = "$IconFile,0" }}
-                $d.Save()
-            }}
-
-            # Registry entry for Installed Apps
-            $RegKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\HardwareGauntlet"
-            New-Item -Path $RegKey -Force | Out-Null
-            Set-ItemProperty -Path $RegKey -Name "DisplayName" -Value "Hardware Gauntlet"
-            Set-ItemProperty -Path $RegKey -Name "DisplayVersion" -Value "1.0.0"
-            Set-ItemProperty -Path $RegKey -Name "Publisher" -Value "Hardware Gauntlet Team"
-            Set-ItemProperty -Path $RegKey -Name "InstallLocation" -Value "{target}"
-            Set-ItemProperty -Path $RegKey -Name "DisplayIcon" -Value "$IconFile"
-            Set-ItemProperty -Path $RegKey -Name "UninstallString" -Value "powershell.exe -ExecutionPolicy Bypass -NoProfile -File `"{target}\\uninstall.ps1`""
-            Set-ItemProperty -Path $RegKey -Name "EstimatedSize" -Value 41000
-
-            if ("{str(self.var_path.get()).lower()}" -eq "true") {{
-                $userPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
-                if ($userPath -notlike "*{target}*") {{
-                    [Environment]::SetEnvironmentVariable("Path", "$userPath;{target}", [EnvironmentVariableTarget]::User)
-                }}
-            }}
-            """
-            subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script], check=False)
+            script_path = os.path.join(self.source_dir, "installer", "install-windows.ps1")
+            if os.path.exists(script_path):
+                subprocess.run(
+                    ["powershell.exe", "-ExecutionPolicy", "Bypass", "-NoProfile", "-File", script_path, "-NoLaunch"],
+                    capture_output=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+                )
 
             self.progress["value"] = 100
-            self.root.after(300, self.show_completed_page)
+            self.root.after(0, self.show_complete_page)
 
-        except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Installation Error", f"Installation failed:\n{e}"))
+        except Exception as err:
+            self.root.after(0, lambda: messagebox.showerror("Installation Error", f"Installation failed:\n{err}"))
 
-    def show_completed_page(self):
+    def show_complete_page(self):
         self.clear_page()
 
-        hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=20, highlightthickness=1, highlightbackground=self.BORDER)
+        hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=18, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
-        tk.Label(hdr, text="✓ Installation Completed!", font=("Segoe UI", 16, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr, text="CARD 03 — INSTALLATION COMPLETED SUCCESSFULLY", font=("Segoe UI", 12, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=32, pady=24)
         body.pack(fill=tk.BOTH, expand=True)
 
-        tk.Label(body, text="Hardware Gauntlet has been installed successfully!", font=("Segoe UI", 12, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(0, 10))
-        tk.Label(body, text=f"Installed Location:\n{self.install_dir.get()}\n\nYou can launch Hardware Gauntlet anytime from your Start Menu or Desktop.", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.BG, justify=tk.LEFT).pack(anchor="w", pady=(0, 16))
+        tk.Label(body, text="✓ Hardware Gauntlet is ready on your PC!", font=("Segoe UI", 13, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(0, 10))
 
-        tk.Checkbutton(body, text="Launch Hardware Gauntlet now", variable=self.var_launch, font=("Segoe UI", 10, "bold"), fg=self.ACCENT_WHITE, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.ACCENT_WHITE).pack(anchor="w")
+        details = (
+            f"• Location: {self.install_dir.get()}\n"
+            "• Desktop Shortcut: Created on Desktop\n"
+            "• Start Menu: Searchable in Windows Search\n"
+            "• CLI Command: Run 'hwscan' anywhere in terminal\n"
+            "• Windows Settings: Registered in Installed Apps"
+        )
+        tk.Label(body, text=details, font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.BG, justify=tk.LEFT).pack(anchor="w", pady=(0, 16))
+
+        tk.Checkbutton(body, text="Launch Hardware Gauntlet now", variable=self.var_launch, font=("Segoe UI", 9, "bold"), fg=self.TEXT, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.TEXT).pack(anchor="w")
 
         footer = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
 
         def finish():
             if self.var_launch.get():
-                target_exe = os.path.join(self.install_dir.get(), "HardwareGauntlet.exe")
-                if os.path.exists(target_exe):
-                    subprocess.Popen([target_exe])
+                target = os.path.join(self.install_dir.get(), "HardwareGauntlet.exe")
+                if os.path.exists(target):
+                    subprocess.Popen([target])
             self.root.destroy()
 
-        tk.Button(footer, text="Finish", command=finish, font=("Segoe UI", 9, "bold"), bg=self.ACCENT_WHITE, fg="#09090b", activebackground=self.ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=20, pady=6, cursor="hand2").pack(side=tk.RIGHT)
+        btn_fin = PillButton(footer, text="FINISH & LAUNCH", command=finish, width=140, height=32, is_primary=True)
+        btn_fin.pack(side=tk.RIGHT, padx=4)
+        btn_fin.configure(bg=self.SURFACE)
+
+        btn_close = PillButton(footer, text="CLOSE", command=self.root.destroy, width=78, height=32, is_primary=False)
+        btn_close.pack(side=tk.RIGHT, padx=4)
+        btn_close.configure(bg=self.SURFACE)
+
+
+def main():
+    root = tk.Tk()
+    SetupWizard(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = SetupWizard(root)
-    root.mainloop()
+    main()

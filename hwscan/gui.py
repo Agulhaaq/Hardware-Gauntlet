@@ -1,11 +1,14 @@
-"""Native Desktop GUI Application for Hardware Gauntlet with Clean Modern Duotone Design.
+"""Native Desktop GUI Application for Hardware Gauntlet with 100Days Design Aesthetic.
 
-Inspired by 100Days Design aesthetic:
-- Thermostat-style circular radial tick dials
-- Sleek pill toggle switches & pill action buttons
-- Minimalist duotone monochrome palette (pure Obsidian & Slate)
-- Categorized cards with stylized dashes ('YOUR SYSTEM —', 'CARD 01 —', 'THERMAL DIAL —')
-- Single-instance mutex enforcement & on-demand manual hardware scan
+Features:
+- Thermostat-style circular radial tick dials (matching 26°C thermostat)
+- Smooth capsule pill buttons (PillButton) matching [ POWER ], [ MODE ], [ DONE ]
+- Pill toggle switches (PillToggle) matching [ ROOM LAMP ] / [ ROOM OUTLET ]
+- Dynamic telemetry waveform curve (TelemetryWaveCanvas) matching upper-right card
+- Modular cards with stylized dashes ('YOUR SYSTEM —', 'CARD 01 —', 'THERMAL DIAL —')
+- Duotone monochrome palette (pure Obsidian & crisp Slate) with instant theme switcher
+- Strict Win32 named Mutex single-instance enforcement
+- On-demand manual hardware scan (never auto-runs on launch)
 """
 
 import os
@@ -16,7 +19,7 @@ import math
 import subprocess
 import webbrowser
 import threading
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, List, Tuple
 
 from hwscan.core.system_info import HardwareScannerEngine
 from hwscan.reporters.html_reporter import HTMLReporter
@@ -31,6 +34,9 @@ from hwscan.core.installer_integration import (
     get_install_directory,
     WINDOW_TITLE
 )
+
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
 
 
 THEMES = {
@@ -59,6 +65,7 @@ THEMES = {
         "dial_bg": "#16161a",
         "dial_active": "#ffffff",
         "dial_inactive": "#27272e",
+        "wave_color": "#ffffff",
         "console_bg": "#0c0c0e",
         "console_fg": "#e4e4e7",
         "tree_bg": "#111114",
@@ -72,7 +79,7 @@ THEMES = {
         "tab_fg": "#a1a1aa",
         "tab_sel_bg": "#ffffff",
         "tab_sel_fg": "#09090b",
-        "toggle_text": "☀️ Light Mode",
+        "toggle_text": "☀️ LIGHT MODE",
         "logo_file": "logo_white_48.png",
         "logo_fallback": "logo_white.png",
     },
@@ -101,6 +108,7 @@ THEMES = {
         "dial_bg": "#ffffff",
         "dial_active": "#09090b",
         "dial_inactive": "#e2e8f0",
+        "wave_color": "#09090b",
         "console_bg": "#f8fafc",
         "console_fg": "#0f172a",
         "tree_bg": "#ffffff",
@@ -114,7 +122,7 @@ THEMES = {
         "tab_fg": "#64748b",
         "tab_sel_bg": "#09090b",
         "tab_sel_fg": "#ffffff",
-        "toggle_text": "🌙 Dark Mode",
+        "toggle_text": "🌙 DARK MODE",
         "logo_file": "logo_black_48.png",
         "logo_fallback": "logo_black.png",
     }
@@ -143,12 +151,91 @@ def get_asset_file_path(filename: str) -> str:
     return os.path.join(repo_root, "assets", filename)
 
 
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+class PillButton(tk.Canvas):
+    """Pill-shaped capsule button matching 100Days design aesthetic."""
+
+    def __init__(self, parent, text="BUTTON", command=None, width=120, height=34, is_primary=True, font=("Segoe UI", 8, "bold"), **kwargs):
+        super().__init__(parent, width=width, height=height, highlightthickness=0, cursor="hand2", **kwargs)
+        self.text = text
+        self.command = command
+        self.w = width
+        self.h = height
+        self.is_primary = is_primary
+        self.btn_font = font
+        self.state = tk.NORMAL
+        self.bg_parent = "#111114"
+        self.fill_color = "#ffffff" if is_primary else "#1e1e24"
+        self.text_color = "#09090b" if is_primary else "#ffffff"
+        self.hover_color = "#e4e4e7" if is_primary else "#282830"
+        self.border_color = "#ffffff" if is_primary else "#2c2c34"
+        self._is_hovered = False
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<Button-1>", self._on_click)
+        self.draw()
+
+    def set_theme(self, bg_parent, fill_primary, text_primary, fill_secondary, text_secondary, border_color):
+        self.bg_parent = bg_parent
+        self.configure(bg=bg_parent)
+        if self.is_primary:
+            self.fill_color = fill_primary
+            self.text_color = text_primary
+            self.border_color = fill_primary
+        else:
+            self.fill_color = fill_secondary
+            self.text_color = text_secondary
+            self.border_color = border_color
+        self.draw()
+
+    def set_text(self, new_text: str):
+        self.text = new_text
+        self.draw()
+
+    def set_state(self, state: str):
+        self.state = state
+        self.configure(cursor="hand2" if state == tk.NORMAL else "arrow")
+        self.draw()
+
+    def _on_enter(self, e):
+        if self.state == tk.NORMAL:
+            self._is_hovered = True
+            self.draw()
+
+    def _on_leave(self, e):
+        self._is_hovered = False
+        self.draw()
+
+    def _on_click(self, e):
+        if self.state == tk.NORMAL and self.command:
+            self.command()
+
+    def draw(self):
+        self.delete("all")
+        rad = (self.h / 2.0) - 2
+        pts = [
+            rad + 2, 2,
+            self.w - rad - 2, 2,
+            self.w - 2, 2,
+            self.w - 2, 2 + rad,
+            self.w - 2, self.h - rad - 2,
+            self.w - 2, self.h - 2,
+            self.w - rad - 2, self.h - 2,
+            rad + 2, self.h - 2,
+            2, self.h - 2,
+            2, self.h - rad - 2,
+            2, 2 + rad,
+            2, 2
+        ]
+        col = self.hover_color if self._is_hovered else self.fill_color
+        if self.state == tk.DISABLED:
+            col = "#27272e"
+        self.create_polygon(pts, smooth=True, fill=col, outline=self.border_color if not self.is_primary else "", width=1)
+        txt_col = self.text_color if self.state == tk.NORMAL else "#71717a"
+        self.create_text(self.w / 2.0, self.h / 2.0, text=self.text, fill=txt_col, font=self.btn_font)
 
 
 class RadialDialWidget(tk.Canvas):
-    """Circular Radial Dial Widget with perimeter tick marks matching thermostat design."""
+    """Circular Radial Dial Widget with perimeter tick marks matching 26°C thermostat design."""
 
     def __init__(self, parent, size: int = 176, title: str = "GAUGE", value_str: str = "--", unit: str = "", sub_str: str = "READY", percent: float = 0.0, **kwargs):
         super().__init__(parent, width=size, height=size, highlightthickness=0, **kwargs)
@@ -190,7 +277,6 @@ class RadialDialWidget(tk.Canvas):
         radius = (self.size / 2.0) - 16
         inner_radius = radius - 10
 
-        # Radial ticks sweeping 270 degrees
         start_angle = 135.0
         sweep_angle = 270.0
         num_ticks = 42
@@ -207,24 +293,19 @@ class RadialDialWidget(tk.Canvas):
             x2 = cx + (radius * math.cos(rad))
             y2 = cy + (radius * math.sin(rad))
 
-            color = self.dial_active if i <= active_count and active_count > 0 else self.dial_inactive
+            color = self.dial_active if (i <= active_count and active_count > 0) else self.dial_inactive
             width = 3 if (i <= active_count and active_count > 0) else 2
             self.create_line(x1, y1, x2, y2, fill=color, width=width, capstyle=tk.ROUND)
 
-        # Center value (e.g. 26°C, 100, 95, 4.2 GHz)
         display_val = f"{self.value_str}{self.unit}"
         val_font_size = 20 if len(display_val) <= 4 else 16
         self.create_text(cx, cy - 8, text=display_val, fill=self.text_color, font=("Segoe UI", val_font_size, "bold"))
-
-        # Small sub-status (e.g. "COOLING", "OPTIMAL", "READY")
         self.create_text(cx, cy + 16, text=self.sub_str.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
-
-        # Bottom label in arc gap (e.g. "TEMP", "HEALTH SCORE", "CPU LOAD")
         self.create_text(cx, cy + radius - 4, text=self.title_text.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
 
 
 class PillToggle(tk.Canvas):
-    """Pill-shaped toggle switch widget matching clean black-and-white switches."""
+    """Pill-shaped toggle switch widget matching clean ROOM LAMP / OUTLET switches."""
 
     def __init__(self, parent, initial: bool = True, on_toggle: Optional[Callable[[bool], None]] = None, **kwargs):
         super().__init__(parent, width=46, height=24, highlightthickness=0, cursor="hand2", **kwargs)
@@ -258,13 +339,11 @@ class PillToggle(tk.Canvas):
 
     def draw(self):
         self.delete("all")
-        # Pill capsule
         fill_color = self.pill_bg_on if self.is_on else self.pill_bg_off
         self.create_oval(2, 2, 22, 22, fill=fill_color, outline="")
         self.create_oval(24, 2, 44, 22, fill=fill_color, outline="")
         self.create_rectangle(12, 2, 34, 22, fill=fill_color, outline="")
 
-        # Circular knob
         knob_color = self.knob_color_on if self.is_on else self.knob_color_off
         if self.is_on:
             self.create_oval(26, 4, 42, 20, fill=knob_color, outline="")
@@ -272,8 +351,47 @@ class PillToggle(tk.Canvas):
             self.create_oval(4, 4, 20, 20, fill=knob_color, outline="")
 
 
+class TelemetryWaveCanvas(tk.Canvas):
+    """Oscillating telemetry wave curve matching the upper right card in the 100Days design."""
+
+    def __init__(self, parent, width=300, height=54, **kwargs):
+        super().__init__(parent, width=width, height=height, highlightthickness=0, **kwargs)
+        self.w = width
+        self.h = height
+        self.phase = 0.0
+        self.wave_color = "#ffffff"
+        self.bg_color = "#16161a"
+        self.draw()
+        self._animate()
+
+    def set_theme(self, bg: str, wave_color: str):
+        self.bg_color = bg
+        self.wave_color = wave_color
+        self.configure(bg=bg)
+        self.draw()
+
+    def _animate(self):
+        if not self.winfo_exists():
+            return
+        self.phase += 0.07
+        self.draw()
+        self.after(60, self._animate)
+
+    def draw(self):
+        self.delete("all")
+        pts = []
+        mid_y = self.h / 2.0
+        amp1 = 12.0
+        amp2 = 6.0
+        for x in range(8, self.w - 8, 4):
+            y = mid_y + amp1 * math.sin((x * 0.038) + self.phase) + amp2 * math.cos((x * 0.082) - self.phase * 0.5)
+            pts.extend([x, y])
+        if len(pts) >= 4:
+            self.create_line(pts, fill=self.wave_color, width=2, smooth=True)
+
+
 class HardwareGauntletGUI:
-    """Orchestrates modern desktop application with clean monochrome design and radial dials."""
+    """Orchestrates modern desktop application with 100Days design aesthetic."""
 
     def __init__(self):
         self.engine = HardwareScannerEngine()
@@ -293,7 +411,7 @@ class HardwareGauntletGUI:
         self._run_tkinter()
 
     def _run_tkinter(self) -> None:
-        """Render native Tkinter GUI with duotone design and radial thermostat gauges."""
+        """Render native Tkinter GUI with duotone design, radial dials, and pill buttons."""
         root = tk.Tk()
         root.title(WINDOW_TITLE)
         root.geometry("1180x820")
@@ -315,11 +433,11 @@ class HardwareGauntletGUI:
             "text_primary": [],
             "text_dim": [],
             "text_muted": [],
-            "btn_primary": [],
-            "btn_secondary": [],
+            "pill_buttons": [],
             "consoles": [],
             "treeviews": [],
             "dials": [],
+            "waves": [],
             "pill_toggles": []
         }
 
@@ -327,7 +445,7 @@ class HardwareGauntletGUI:
         style.theme_use("clam")
 
         # -------------------------------------------------------------
-        # Header Toolbar
+        # Header Toolbar (Clean Monochrome + Pill Buttons)
         # -------------------------------------------------------------
         header = tk.Frame(root, padx=24, pady=16, highlightthickness=1)
         header.pack(fill=tk.X, side=tk.TOP)
@@ -350,7 +468,7 @@ class HardwareGauntletGUI:
         title_row.pack(anchor="w")
         themed_widgets["surface"].append(title_row)
 
-        lbl_main_title = tk.Label(title_row, text="YOUR SYSTEM — HARDWARE GAUNTLET", font=("Segoe UI", 14, "bold"))
+        lbl_main_title = tk.Label(title_row, text="YOUR SYSTEM — HARDWARE GAUNTLET", font=("Segoe UI", 13, "bold"))
         lbl_main_title.pack(side=tk.LEFT)
         themed_widgets["surface"].append(lbl_main_title)
         themed_widgets["text_primary"].append(lbl_main_title)
@@ -360,7 +478,7 @@ class HardwareGauntletGUI:
         themed_widgets["card_alts"].append(lbl_tag)
         themed_widgets["text_dim"].append(lbl_tag)
 
-        lbl_subtitle = tk.Label(title_text_box, text="System Standby — Click '▶ Run Full Scan' to audit hardware parameters.", font=("Segoe UI", 9))
+        lbl_subtitle = tk.Label(title_text_box, text="System Standby — Click '▶ RUN FULL SCAN' to audit hardware parameters.", font=("Segoe UI", 9))
         lbl_subtitle.pack(anchor="w", pady=(2, 0))
         themed_widgets["surface"].append(lbl_subtitle)
         themed_widgets["text_dim"].append(lbl_subtitle)
@@ -374,9 +492,11 @@ class HardwareGauntletGUI:
             if self._is_scanning:
                 return
             self._is_scanning = True
-            btn_scan.config(state=tk.DISABLED, text="⏳ Scanning...")
-            btn_overview_scan.config(state=tk.DISABLED, text="⏳ Scanning...")
-            dial_health.update_value("...", 30.0, "AUDITING")
+            btn_scan.set_state(tk.DISABLED)
+            btn_scan.set_text("⏳ SCANNING...")
+            btn_overview_scan.set_state(tk.DISABLED)
+            btn_overview_scan.set_text("⏳ SCANNING...")
+            dial_health.update_value("...", 35.0, "AUDITING")
             lbl_subtitle.config(text="Auditing processor architecture, DIMM memory modules, GPU, storage arrays, and UEFI security...")
             threading.Thread(target=run_background_scan, daemon=True).start()
 
@@ -408,11 +528,13 @@ class HardwareGauntletGUI:
                 messagebox.showinfo("JSON Saved", f"Machine-readable JSON report saved to:\n{f}")
 
         def do_install():
-            btn_install.config(state=tk.DISABLED, text="⏳ Installing...")
+            btn_install.set_state(tk.DISABLED)
+            btn_install.set_text("⏳ INSTALLING...")
             def worker():
                 success, msg = install_application()
                 def on_done():
-                    btn_install.config(state=tk.NORMAL, text="✓ Installed" if success else "📦 Install to PC")
+                    btn_install.set_state(tk.NORMAL)
+                    btn_install.set_text("✓ INSTALLED" if success else "📦 INSTALL TO PC")
                     if success:
                         lbl_install_status.config(text=f"Status: Installed at {get_install_directory()}")
                         messagebox.showinfo("Installation Complete", f"{msg}\n\n• Start Menu shortcut created\n• Desktop shortcut created\n• CLI command 'hwscan' added to PATH\n• Visible in Windows Settings > Installed Apps")
@@ -431,25 +553,26 @@ class HardwareGauntletGUI:
             except Exception as err:
                 messagebox.showerror("Tool Error", f"Unable to launch {tool_cmd}:\n{err}")
 
-        btn_scan = tk.Button(btn_frame, text="▶ Run Full Scan", command=do_scan, font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1)
+        # Pill Buttons in Header
+        btn_scan = PillButton(btn_frame, text="▶ RUN SCAN", command=do_scan, width=116, height=32, is_primary=True)
         btn_scan.pack(side=tk.LEFT, padx=3)
-        themed_widgets["btn_primary"].append(btn_scan)
+        themed_widgets["pill_buttons"].append(btn_scan)
 
-        btn_install = tk.Button(btn_frame, text="✓ Installed" if is_installed() else "📦 Install to PC", command=do_install, font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=12, pady=6, cursor="hand2", highlightthickness=1)
+        btn_install = PillButton(btn_frame, text="✓ INSTALLED" if is_installed() else "📦 INSTALL", command=do_install, width=108, height=32, is_primary=False)
         btn_install.pack(side=tk.LEFT, padx=3)
-        themed_widgets["btn_secondary"].append(btn_install)
+        themed_widgets["pill_buttons"].append(btn_install)
 
-        btn_theme = tk.Button(btn_frame, command=toggle_theme, font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=10, pady=6, cursor="hand2", highlightthickness=1)
+        btn_theme = PillButton(btn_frame, text="☀️ LIGHT", command=toggle_theme, width=96, height=32, is_primary=False)
         btn_theme.pack(side=tk.LEFT, padx=3)
-        themed_widgets["btn_secondary"].append(btn_theme)
+        themed_widgets["pill_buttons"].append(btn_theme)
 
-        btn_html = tk.Button(btn_frame, text="📄 HTML", command=do_export_html, font=("Segoe UI", 9), relief=tk.FLAT, padx=10, pady=6, cursor="hand2", highlightthickness=1)
+        btn_html = PillButton(btn_frame, text="📄 HTML", command=do_export_html, width=82, height=32, is_primary=False)
         btn_html.pack(side=tk.LEFT, padx=3)
-        themed_widgets["btn_secondary"].append(btn_html)
+        themed_widgets["pill_buttons"].append(btn_html)
 
-        btn_json = tk.Button(btn_frame, text="💾 JSON", command=do_export_json, font=("Segoe UI", 9), relief=tk.FLAT, padx=8, pady=6, cursor="hand2", highlightthickness=1)
+        btn_json = PillButton(btn_frame, text="💾 JSON", command=do_export_json, width=78, height=32, is_primary=False)
         btn_json.pack(side=tk.LEFT, padx=3)
-        themed_widgets["btn_secondary"].append(btn_json)
+        themed_widgets["pill_buttons"].append(btn_json)
 
         # -------------------------------------------------------------
         # Main Tab Navigation
@@ -473,7 +596,7 @@ class HardwareGauntletGUI:
         tab_tools = create_tab("🛠️ Diagnostics & Install")
 
         # -------------------------------------------------------------
-        # Tab 1: Overview with Circular Dial & System Cards
+        # Tab 1: Overview with Thermostat Dial & Telemetry Wave
         # -------------------------------------------------------------
         overview_top = tk.Frame(tab_overview)
         overview_top.pack(fill=tk.X, pady=(0, 14))
@@ -499,26 +622,56 @@ class HardwareGauntletGUI:
         dial_health.pack(pady=4)
         themed_widgets["dials"].append((dial_health, "cards"))
 
+        # Underneath dial: Two pill buttons side by side matching [ POWER ] and [ MODE ]
         dial_btn_row = tk.Frame(card_dial)
         dial_btn_row.pack(fill=tk.X, pady=(12, 0))
         themed_widgets["cards"].append(dial_btn_row)
 
-        btn_overview_scan = tk.Button(dial_btn_row, text="▶ Run Scan", command=do_scan, font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=10, pady=5, cursor="hand2", highlightthickness=1)
-        btn_overview_scan.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 4))
-        themed_widgets["btn_primary"].append(btn_overview_scan)
+        btn_overview_scan = PillButton(dial_btn_row, text="▶ RUN SCAN", command=do_scan, width=108, height=32, is_primary=True)
+        btn_overview_scan.pack(side=tk.LEFT, padx=(0, 4))
+        themed_widgets["pill_buttons"].append(btn_overview_scan)
 
-        btn_overview_export = tk.Button(dial_btn_row, text="📄 Report", command=do_export_html, font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=10, pady=5, cursor="hand2", highlightthickness=1)
-        btn_overview_export.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
-        themed_widgets["btn_secondary"].append(btn_overview_export)
+        btn_overview_export = PillButton(dial_btn_row, text="📄 REPORT", command=do_export_html, width=108, height=32, is_primary=False)
+        btn_overview_export.pack(side=tk.LEFT, padx=(4, 0))
+        themed_widgets["pill_buttons"].append(btn_overview_export)
 
-        # Right 4 System Architecture Cards
-        overview_cards_grid = tk.Frame(overview_top)
-        overview_cards_grid.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Right Column: Telemetry Waveform Card + 4 Metric Cards
+        overview_right = tk.Frame(overview_top)
+        overview_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        themed_widgets["root_bg"].append(overview_right)
+
+        # Waveform card (matching upper right card in 100Days design)
+        card_wave = tk.Frame(overview_right, padx=18, pady=12, highlightthickness=1)
+        card_wave.pack(fill=tk.X, pady=(0, 10))
+        themed_widgets["cards"].append(card_wave)
+        themed_widgets["borders"].append(card_wave)
+
+        wave_header = tk.Frame(card_wave)
+        wave_header.pack(fill=tk.X)
+        themed_widgets["cards"].append(wave_header)
+
+        lbl_wave_title = tk.Label(wave_header, text="YOUR SYSTEM — REAL-TIME TELEMETRY", font=("Segoe UI", 9, "bold"))
+        lbl_wave_title.pack(side=tk.LEFT)
+        themed_widgets["cards"].append(lbl_wave_title)
+        themed_widgets["text_primary"].append(lbl_wave_title)
+
+        wave_canvas = TelemetryWaveCanvas(card_wave, width=540, height=48)
+        wave_canvas.pack(fill=tk.X, pady=(4, 4))
+        themed_widgets["waves"].append(wave_canvas)
+
+        lbl_wave_sub = tk.Label(card_wave, text="Continuous hardware pulse — All buses verified nominal", font=("Segoe UI", 8))
+        lbl_wave_sub.pack(anchor="w")
+        themed_widgets["cards"].append(lbl_wave_sub)
+        themed_widgets["text_dim"].append(lbl_wave_sub)
+
+        # 4 System Metric Cards in 2x2 Grid
+        overview_cards_grid = tk.Frame(overview_right)
+        overview_cards_grid.pack(fill=tk.BOTH, expand=True)
         themed_widgets["root_bg"].append(overview_cards_grid)
 
         def create_metric_card(parent, card_num, title, row, col):
-            card = tk.Frame(parent, padx=16, pady=12, highlightthickness=1)
-            card.grid(row=row, column=col, sticky="nsew", padx=4, pady=4)
+            card = tk.Frame(parent, padx=16, pady=10, highlightthickness=1)
+            card.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
             themed_widgets["cards"].append(card)
             themed_widgets["borders"].append(card)
 
@@ -527,8 +680,8 @@ class HardwareGauntletGUI:
             themed_widgets["cards"].append(lbl_hdr)
             themed_widgets["text_dim"].append(lbl_hdr)
 
-            lbl_v = tk.Label(card, text="Click 'Run Scan'", font=("Segoe UI", 12, "bold"))
-            lbl_v.pack(anchor="w", pady=(4, 2))
+            lbl_v = tk.Label(card, text="Click '▶ RUN SCAN'", font=("Segoe UI", 11, "bold"))
+            lbl_v.pack(anchor="w", pady=(3, 1))
             themed_widgets["cards"].append(lbl_v)
             themed_widgets["text_primary"].append(lbl_v)
 
@@ -563,7 +716,7 @@ class HardwareGauntletGUI:
         tree_warn.column("details", width=760)
         tree_warn.pack(fill=tk.BOTH, expand=True)
         themed_widgets["treeviews"].append(tree_warn)
-        tree_warn.insert("", tk.END, values=("READY", "Scanner", "System audit ready. Click '▶ Run Full Scan' in the toolbar to begin analysis."), tags=("even",))
+        tree_warn.insert("", tk.END, values=("READY", "Scanner", "System audit ready. Click '▶ RUN FULL SCAN' in the toolbar to begin analysis."), tags=("even",))
 
         # -------------------------------------------------------------
         # Tab 2: 🔥 Stress Test with Dual Thermostat Dials & Pill Toggles
@@ -587,7 +740,7 @@ class HardwareGauntletGUI:
         dial_thermal.pack(pady=4)
         themed_widgets["dials"].append((dial_thermal, "cards"))
 
-        # Dial 2: CPU Load Dial
+        # Dial 2: CPU Torture Dial
         card_cpu_dial = tk.Frame(stress_top, width=240, padx=16, pady=14, highlightthickness=1)
         card_cpu_dial.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 12))
         themed_widgets["cards"].append(card_cpu_dial)
@@ -653,7 +806,7 @@ class HardwareGauntletGUI:
         add_pill_switch_row(card_controls, "💾", "RAM Bit-Flip Integrity", "Allocates 1GB pattern buffers (0xAA, 0x55) to catch memory decay", var_test_ram)
         add_pill_switch_row(card_controls, "💽", "Disk Sequential I/O", "Benchmarks sustained sequential write and read speeds (MB/s)", var_test_disk)
 
-        # Duration & Execution buttons row (matching [ POWER ] [ MODE ] [ START ])
+        # Duration & Pill Execution buttons (matching [ POWER ] [ MODE ] [ START ])
         stress_act_row = tk.Frame(card_controls, pady=8)
         stress_act_row.pack(fill=tk.X, pady=(6, 0))
         themed_widgets["cards"].append(stress_act_row)
@@ -664,15 +817,17 @@ class HardwareGauntletGUI:
 
         combo_duration = ttk.Combobox(stress_act_row, values=["15s (Quick Check)", "30s (Standard Run)", "60s (Heavy Torture)", "120s (Burn-in)"], state="readonly", width=18)
         combo_duration.current(1)
-        combo_duration.pack(side=tk.LEFT, padx=(0, 14))
+        combo_duration.pack(side=tk.LEFT, padx=(0, 12))
 
-        btn_start_stress = tk.Button(stress_act_row, text="▶ Start Torture", font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=14, pady=5, cursor="hand2", highlightthickness=1)
+        # Pill buttons for stress start and stop
+        btn_start_stress = PillButton(stress_act_row, text="▶ START TORTURE", width=128, height=32, is_primary=True)
         btn_start_stress.pack(side=tk.LEFT, padx=(0, 6))
-        themed_widgets["btn_primary"].append(btn_start_stress)
+        themed_widgets["pill_buttons"].append(btn_start_stress)
 
-        btn_stop_stress = tk.Button(stress_act_row, text="⏹ Stop", font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=12, pady=5, cursor="hand2", state=tk.DISABLED, highlightthickness=1)
+        btn_stop_stress = PillButton(stress_act_row, text="⏹ STOP", width=76, height=32, is_primary=False)
         btn_stop_stress.pack(side=tk.LEFT)
-        themed_widgets["btn_secondary"].append(btn_stop_stress)
+        btn_stop_stress.set_state(tk.DISABLED)
+        themed_widgets["pill_buttons"].append(btn_stop_stress)
 
         # Progress bar
         stress_progress_frame = tk.Frame(tab_stress)
@@ -682,7 +837,7 @@ class HardwareGauntletGUI:
         stress_progress = ttk.Progressbar(stress_progress_frame, mode="determinate", length=600)
         stress_progress.pack(fill=tk.X)
 
-        lbl_stress_status = tk.Label(stress_progress_frame, text="Status: Ready to benchmark. Select duration and click '▶ Start Torture'.", font=("Segoe UI", 9))
+        lbl_stress_status = tk.Label(stress_progress_frame, text="Status: Ready to benchmark. Select duration and click '▶ START TORTURE'.", font=("Segoe UI", 9))
         lbl_stress_status.pack(anchor="w", pady=(3, 0))
         themed_widgets["root_bg"].append(lbl_stress_status)
         themed_widgets["text_dim"].append(lbl_stress_status)
@@ -718,7 +873,7 @@ class HardwareGauntletGUI:
         log_console("Hardware Gauntlet Torture Engine online.")
         log_console("Multi-core CPU mathematical torture, RAM pattern integrity, and thermal telemetry active.")
 
-        # Windows Tools Box
+        # Windows Benchmarks Box with Pill buttons
         win_tools_box = tk.Frame(stress_bottom, width=280, padx=14, pady=12, highlightthickness=1)
         win_tools_box.pack(side=tk.RIGHT, fill=tk.Y)
         themed_widgets["surface"].append(win_tools_box)
@@ -729,19 +884,19 @@ class HardwareGauntletGUI:
         themed_widgets["surface"].append(lbl_win_bench)
         themed_widgets["text_primary"].append(lbl_win_bench)
 
-        def add_quick_tool(title, desc, cmd):
+        def add_quick_tool(title, cmd):
             f = tk.Frame(win_tools_box, pady=3)
             f.pack(fill=tk.X)
             themed_widgets["surface"].append(f)
-            b = tk.Button(f, text=title, command=lambda: launch_os_tool(cmd), font=("Segoe UI", 8, "bold"), relief=tk.FLAT, padx=8, pady=4, cursor="hand2", highlightthickness=1)
+            b = PillButton(f, text=title, command=lambda: launch_os_tool(cmd), width=236, height=30, is_primary=False)
             b.pack(fill=tk.X)
-            themed_widgets["btn_secondary"].append(b)
+            themed_widgets["pill_buttons"].append(b)
 
         if sys.platform == "win32":
-            add_quick_tool("🧠 Windows Memory Check", "Schedule deep BIOS RAM test", "mdsched.exe")
-            add_quick_tool("📈 System Performance", "Generate 60s perf report", "perfmon.exe /report")
-            add_quick_tool("⚡ WinSAT Assessment", "Windows assessment tool", "winsat.exe formal")
-            add_quick_tool("🎮 DirectX Diagnostic", "DirectX & display driver check", "dxdiag.exe")
+            add_quick_tool("🧠 MEMORY CHECK (mdsched)", "mdsched.exe")
+            add_quick_tool("📈 PERF REPORT (perfmon)", "perfmon.exe /report")
+            add_quick_tool("⚡ WINSAT BENCHMARK", "winsat.exe formal")
+            add_quick_tool("🎮 DIRECTX DIAGNOSTIC", "dxdiag.exe")
         else:
             lbl_other = tk.Label(win_tools_box, text="Platform benchmark utilities available via OS console.", font=("Segoe UI", 8))
             lbl_other.pack(anchor="w")
@@ -772,8 +927,8 @@ class HardwareGauntletGUI:
         def on_stress_complete(summary: Dict[str, Any]):
             def update():
                 stress_progress["value"] = 100
-                btn_start_stress.config(state=tk.NORMAL)
-                btn_stop_stress.config(state=tk.DISABLED)
+                btn_start_stress.set_state(tk.NORMAL)
+                btn_stop_stress.set_state(tk.DISABLED)
 
                 verdict = summary.get("stability_status", "PASSED")
                 dial_cpu.update_value("0.0", 0.0, "COMPLETE")
@@ -798,8 +953,8 @@ class HardwareGauntletGUI:
                 messagebox.showwarning("Selection Required", "Please select at least one subsystem to stress test.")
                 return
 
-            btn_start_stress.config(state=tk.DISABLED)
-            btn_stop_stress.config(state=tk.NORMAL)
+            btn_start_stress.set_state(tk.DISABLED)
+            btn_stop_stress.set_state(tk.NORMAL)
             stress_progress["value"] = 0
             lbl_stress_status.config(text="Status: Launching hardware stress workers...")
 
@@ -816,13 +971,13 @@ class HardwareGauntletGUI:
 
         def stop_stress():
             self.stress_engine.stop_test()
-            btn_start_stress.config(state=tk.NORMAL)
-            btn_stop_stress.config(state=tk.DISABLED)
+            btn_start_stress.set_state(tk.NORMAL)
+            btn_stop_stress.set_state(tk.DISABLED)
             lbl_stress_status.config(text="Status: Test stopped by user.")
             log_console("Stress test aborted by user.")
 
-        btn_start_stress.config(command=start_stress)
-        btn_stop_stress.config(command=stop_stress)
+        btn_start_stress.command = start_stress
+        btn_stop_stress.command = stop_stress
 
         # -------------------------------------------------------------
         # Tab 3: CPU & Motherboard
@@ -923,15 +1078,15 @@ class HardwareGauntletGUI:
             themed_widgets["surface"].append(d)
             themed_widgets["text_dim"].append(d)
 
-            b = tk.Button(card, text="Launch Tool", command=lambda: launch_os_tool(cmd), font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=10, pady=4, cursor="hand2", highlightthickness=1)
+            b = PillButton(card, text="LAUNCH TOOL", command=lambda: launch_os_tool(cmd), width=180, height=30, is_primary=False)
             b.pack(fill=tk.X)
-            themed_widgets["btn_secondary"].append(b)
+            themed_widgets["pill_buttons"].append(b)
 
         if sys.platform == "win32":
-            add_tool_card(tools_grid, "🔌 Device Manager", "Hardware drivers, controllers, PnP IDs", "devmgmt.msc")
-            add_tool_card(tools_grid, "📈 Task Manager", "Real-time thread & memory utilization", "taskmgr.exe")
-            add_tool_card(tools_grid, "💾 Disk Management", "Partition layouts, volume health", "diskmgmt.msc")
-            add_tool_card(tools_grid, "ℹ️ System Info", "MSInfo32 BIOS and firmware tables", "msinfo32.exe")
+            add_tool_card(tools_grid, "🔌 Device Manager", "Hardware drivers & controllers", "devmgmt.msc")
+            add_tool_card(tools_grid, "📈 Task Manager", "Real-time thread utilization", "taskmgr.exe")
+            add_tool_card(tools_grid, "💾 Disk Management", "Partition layouts & health", "diskmgmt.msc")
+            add_tool_card(tools_grid, "ℹ️ System Info", "MSInfo32 firmware tables", "msinfo32.exe")
 
         # Installation & System Registration Card
         install_card = tk.Frame(tab_tools, padx=20, pady=16, highlightthickness=1)
@@ -957,31 +1112,31 @@ class HardwareGauntletGUI:
         inst_btn_row.pack(anchor="w", pady=(0, 14))
         themed_widgets["surface"].append(inst_btn_row)
 
-        btn_install_tab = tk.Button(inst_btn_row, text="📦 Install to PC (Desktop, Start Menu, PATH)", command=do_install, font=("Segoe UI", 9, "bold"), relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1)
+        btn_install_tab = PillButton(inst_btn_row, text="📦 INSTALL TO PC", command=do_install, width=150, height=34, is_primary=True)
         btn_install_tab.pack(side=tk.LEFT, padx=(0, 10))
-        themed_widgets["btn_primary"].append(btn_install_tab)
+        themed_widgets["pill_buttons"].append(btn_install_tab)
 
         def do_open_folder():
             p = get_install_directory() if is_installed() else os.getcwd()
             os.startfile(p) if sys.platform == "win32" else subprocess.Popen(["xdg-open", p])
 
-        btn_folder = tk.Button(inst_btn_row, text="📂 Open Program Folder", command=do_open_folder, font=("Segoe UI", 9), relief=tk.FLAT, padx=12, pady=6, cursor="hand2", highlightthickness=1)
+        btn_folder = PillButton(inst_btn_row, text="📂 OPEN FOLDER", command=do_open_folder, width=130, height=34, is_primary=False)
         btn_folder.pack(side=tk.LEFT, padx=(0, 10))
-        themed_widgets["btn_secondary"].append(btn_folder)
+        themed_widgets["pill_buttons"].append(btn_folder)
 
         def do_uninstall():
             if messagebox.askyesno("Uninstall", "Are you sure you want to uninstall Hardware Gauntlet from your PC?"):
                 success, msg = uninstall_application()
                 if success:
                     lbl_install_status.config(text="Status: Uninstalled from PC (Running portable)")
-                    btn_install.config(text="📦 Install to PC")
+                    btn_install.set_text("📦 INSTALL")
                     messagebox.showinfo("Uninstalled", "Hardware Gauntlet shortcuts and registry entries have been removed.")
                 else:
                     messagebox.showerror("Error", msg)
 
-        btn_uninst = tk.Button(inst_btn_row, text="🗑️ Uninstall", command=do_uninstall, font=("Segoe UI", 9), relief=tk.FLAT, padx=10, pady=6, cursor="hand2", highlightthickness=1)
+        btn_uninst = PillButton(inst_btn_row, text="🗑️ UNINSTALL", command=do_uninstall, width=110, height=34, is_primary=False)
         btn_uninst.pack(side=tk.LEFT)
-        themed_widgets["btn_secondary"].append(btn_uninst)
+        themed_widgets["pill_buttons"].append(btn_uninst)
 
         info_text = (
             "• Running Mode: Native Offline Client Application (Zero Network / No Localhost Required)\n"
@@ -1067,28 +1222,17 @@ class HardwareGauntletGUI:
                 except Exception:
                     pass
 
-            for b in themed_widgets["btn_primary"]:
+            for btn in themed_widgets["pill_buttons"]:
                 try:
-                    b.config(
-                        bg=th["accent"],
-                        fg=th["accent_text"],
-                        activebackground=th["accent_hover"],
-                        activeforeground=th["accent_text"],
-                        highlightbackground=th["border"],
-                        highlightcolor=th["border"]
-                    )
-                except Exception:
-                    pass
-
-            for b in themed_widgets["btn_secondary"]:
-                try:
-                    b.config(
-                        bg=th["btn_bg"],
-                        fg=th["btn_fg"],
-                        activebackground=th["btn_hover"],
-                        activeforeground=th["btn_fg"],
-                        highlightbackground=th["btn_border"],
-                        highlightcolor=th["btn_border"]
+                    # Resolve parent background
+                    parent_bg = th["surface"] if btn.master == btn_frame else th["card"]
+                    btn.set_theme(
+                        bg_parent=parent_bg,
+                        fill_primary=th["accent"],
+                        text_primary=th["accent_text"],
+                        fill_secondary=th["btn_bg"],
+                        text_secondary=th["btn_fg"],
+                        border_color=th["btn_border"]
                     )
                 except Exception:
                     pass
@@ -1118,6 +1262,12 @@ class HardwareGauntletGUI:
                 except Exception:
                     pass
 
+            for wave in themed_widgets["waves"]:
+                try:
+                    wave.set_theme(bg=th["card"], wave_color=th["wave_color"])
+                except Exception:
+                    pass
+
             for toggle, container_key in themed_widgets["pill_toggles"]:
                 try:
                     parent_bg = th[container_key] if container_key in th else th["card"]
@@ -1130,14 +1280,14 @@ class HardwareGauntletGUI:
                 except Exception:
                     pass
 
-            btn_theme.config(text=th["toggle_text"])
+            btn_theme.set_text(th["toggle_text"])
 
             logo_img = get_theme_logo(self.current_theme)
             if logo_img:
                 lbl_logo.config(image=logo_img)
                 lbl_logo.image = logo_img
 
-            # TTK Styles
+            # TTK Styles for Treeviews and Notebook
             style.configure("TNotebook", background=th["bg"], borderwidth=0)
             style.configure(
                 "TNotebook.Tab",
@@ -1194,8 +1344,10 @@ class HardwareGauntletGUI:
             dial_health.update_value(str(score), float(score), status_text)
 
             lbl_subtitle.config(text=f"Host: {report.system.hostname} • OS: {report.system.os_name} ({report.system.os_arch}) • Uptime: {report.system.uptime_formatted}")
-            btn_scan.config(state=tk.NORMAL, text="⟳ Re-Scan")
-            btn_overview_scan.config(state=tk.NORMAL, text="⟳ Re-Scan")
+            btn_scan.set_state(tk.NORMAL)
+            btn_scan.set_text("⟳ RE-SCAN")
+            btn_overview_scan.set_state(tk.NORMAL)
+            btn_overview_scan.set_text("⟳ RE-SCAN")
 
             # KPI values
             kpi_cpu_v.config(text=report.cpu.model[:24])
