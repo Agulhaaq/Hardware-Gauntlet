@@ -12,6 +12,8 @@ dist/
 *.egg-info/
 .eggs/
 *.spec
+!HardwareGauntlet.spec
+!Setup-HardwareGauntlet.spec
 *.exe
 
 

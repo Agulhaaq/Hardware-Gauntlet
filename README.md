@@ -86,6 +86,15 @@ hwscan
 
 ## 🌟 Key Capabilities
 
+- **🔒 Strict Single-Instance Enforcement**: Named Win32 Mutex ensures only 1 application instance runs at a time. Launching a second instance automatically activates, un-minimizes, and focuses the running window.
+- **⚡ On-Demand Manual Scan**: Complete user control — scans never auto-fire on launch; the application opens in a clean standby state ready for your explicit `▶ Run Full Scan` trigger.
+- **🔥 Hardware Stress & Thermal Stability Engine**:
+  - **Multi-Core CPU Torture**: Full load on all logical cores with floating-point calculations and SHA-256 iterations.
+  - **RAM Bit-Flip Integrity**: Allocates test pattern buffers (`0xAA`, `0x55`, `0x00`, `0xFF`) and verifies against memory cell decay and bit corruption.
+  - **Disk Sequential I/O**: Measures sustained sequential Write and Read speeds in MB/s.
+  - **Thermal & Throttling Monitor**: Live GPU temperatures (`nvidia-smi`), clock frequency throttling, and stability verdicts (`PASSED` vs `FAILED`).
+  - **Windows Benchmark Shortcuts**: 1-click execution for `mdsched.exe` (Windows Memory Diagnostic), `perfmon.exe /report`, `winsat.exe`, and `dxdiag.exe`.
+- **📦 1-Click In-App Installation**: Built-in "📦 Install to PC" button installs to `%LOCALAPPDATA%\Programs\HardwareGauntlet`, creates Desktop & Start Menu shortcuts, registers in Windows Settings Installed Apps, and binds `hwscan` to User `PATH`.
 - **🧠 Deep CPU Telemetry**: Cores (physical/logical), base & max frequencies, L1/L2/L3 cache sizes, architecture, instruction sets (AVX, AVX2, SSE4.2, AES-NI), and real-time utilization.
 - **📊 Motherboard & BIOS Audit**: Manufacturer, board model, revision, serial number, BIOS vendor, version, release date, and chassis form factor.
 - **💾 Memory (RAM) & DIMM Slots**: Total & used RAM, swap/pagefile, individual DIMM slot labels, module capacity, speed (MHz), memory technology (DDR4, DDR5, LPDDR5), manufacturer, and part numbers.
@@ -95,6 +104,7 @@ hwscan
 - **🔒 Hardware Security Checks**: UEFI Secure Boot state, TPM 2.0 presence and firmware version, and Hardware Virtualization (VT-x / AMD-V) status.
 - **🔋 Battery & Power Diagnostics**: Laptop battery percentage, AC adapter status, charge cycle counts, and capacity degradation.
 - **🎯 Intelligent Health Score (0-100)**: Evaluates overall hardware health, flags mismatched memory speeds, asymmetrical RAM capacity, critical disk usage, or disabled firmware security.
+- **🎨 Stealth Monochrome & Dual Theme Support**: Instant real-time toggling between `🌙 Dark Mode` (deep obsidian `#09090b`) and `☀️ Light Mode` (crisp modern slate `#f4f4f5`).
 - **📄 Multi-Format Reporting**:
   - Interactive styled terminal dashboard (`rich` + auto ASCII fallback)
   - Standalone single-file HTML audit report (interactive with print/PDF export)
@@ -157,6 +167,8 @@ Hardware-Gauntlet/
 │   ├── core/
 │   │   ├── models.py         # Hardware dataclasses & JSON serializers
 │   │   ├── system_info.py    # Master engine & health scoring
+│   │   ├── stress_test.py    # Multi-core CPU, RAM pattern, and disk throughput engine
+│   │   ├── installer_integration.py # Single-instance mutex and in-app system installer
 │   │   └── utils.py          # Cross-platform subprocess & formatters
 │   ├── scanners/
 │   │   ├── base.py           # BaseScanner interface
