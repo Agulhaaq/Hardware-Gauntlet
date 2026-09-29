@@ -3,6 +3,7 @@
 import json
 from hwscan.core.models import HardwareReport
 from hwscan.core.utils import format_bytes, format_hz
+from hwscan.assets_data import LOGO_WHITE_B64
 
 
 class HTMLReporter:
@@ -120,17 +121,16 @@ class HTMLReporter:
     <title>Hardware Gauntlet Report - {report.system.hostname}</title>
     <style>
         :root {{
-            --bg-color: #0b0f19;
-            --surface-color: #111827;
-            --surface-border: #1f2937;
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent-cyan: #06b6d4;
-            --accent-blue: #3b82f6;
-            --accent-green: #10b981;
+            --bg-color: #09090b;
+            --surface-color: #121215;
+            --surface-card: #18181b;
+            --surface-border: #27272a;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --accent-green: #ffffff;
             --accent-yellow: #f59e0b;
             --accent-red: #ef4444;
-            --accent-purple: #8b5cf6;
+            --accent-purple: #d4d4d8;
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
         body {{ background-color: var(--bg-color); color: var(--text-primary); line-height: 1.6; padding: 24px; }}
@@ -140,15 +140,16 @@ class HTMLReporter:
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
-            backdrop-filter: blur(10px);
+            background: var(--surface-color);
             border: 1px solid var(--surface-border);
             padding: 24px 32px;
             border-radius: 16px;
             margin-bottom: 24px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }}
-        .header-title h1 {{ font-size: 1.8rem; font-weight: 800; background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
+        .header-title-box {{ display: flex; align-items: center; gap: 16px; }}
+        .header-logo {{ width: 52px; height: 52px; border-radius: 10px; }}
+        .header-title h1 {{ font-size: 1.8rem; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; }}
         .header-title p {{ color: var(--text-secondary); font-size: 0.95rem; margin-top: 4px; }}
         .header-score {{ display: flex; align-items: center; gap: 16px; }}
         
@@ -156,20 +157,20 @@ class HTMLReporter:
             text-align: center;
             padding: 12px 20px;
             border-radius: 12px;
-            background: rgba(0,0,0,0.3);
-            border: 2px solid;
+            background: var(--surface-card);
+            border: 1px solid var(--surface-border);
         }}
-        .score-high {{ border-color: var(--accent-green); color: var(--accent-green); }}
-        .score-med {{ border-color: var(--accent-yellow); color: var(--accent-yellow); }}
-        .score-low {{ border-color: var(--accent-red); color: var(--accent-red); }}
+        .score-high {{ color: #ffffff; border-color: #3f3f46; }}
+        .score-med {{ color: var(--accent-yellow); border-color: rgba(245, 158, 11, 0.4); }}
+        .score-low {{ color: var(--accent-red); border-color: rgba(239, 68, 68, 0.4); }}
         .score-box .num {{ font-size: 2.2rem; font-weight: 800; line-height: 1; }}
         .score-box .lbl {{ font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); }}
 
         .actions {{ display: flex; gap: 10px; }}
         button.btn {{
-            background: #1e293b;
-            color: #fff;
-            border: 1px solid #334155;
+            background: var(--surface-card);
+            color: #ffffff;
+            border: 1px solid var(--surface-border);
             padding: 10px 18px;
             border-radius: 8px;
             font-weight: 600;
@@ -179,9 +180,9 @@ class HTMLReporter:
             align-items: center;
             gap: 8px;
         }}
-        button.btn:hover {{ background: #334155; border-color: #475569; }}
-        button.btn-primary {{ background: linear-gradient(135deg, #2563eb, #3b82f6); border: none; }}
-        button.btn-primary:hover {{ background: linear-gradient(135deg, #1d4ed8, #2563eb); }}
+        button.btn:hover {{ background: #27272a; border-color: #3f3f46; }}
+        button.btn-primary {{ background: #ffffff; color: #09090b; border: 1px solid #ffffff; }}
+        button.btn-primary:hover {{ background: #e4e4e7; }}
 
         .grid-cards {{
             display: grid;
@@ -200,8 +201,8 @@ class HTMLReporter:
         .stat-card::before {{
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0; height: 3px;
-            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            top: 0; left: 0; right: 0; height: 2px;
+            background: #ffffff;
         }}
         .stat-card h4 {{ color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }}
         .stat-card .val {{ font-size: 1.3rem; font-weight: 700; color: #fff; }}
@@ -216,11 +217,11 @@ class HTMLReporter:
             box-shadow: 0 4px 20px rgba(0,0,0,0.2);
         }}
         .card-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }}
-        .card-header h3 {{ font-size: 1.25rem; font-weight: 700; color: #f1f5f9; display: flex; align-items: center; gap: 8px; }}
+        .card-header h3 {{ font-size: 1.25rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; }}
 
         table {{ width: 100%; border-collapse: collapse; text-align: left; }}
-        th {{ background: #1e293b; color: #94a3b8; padding: 12px 16px; font-size: 0.85rem; text-transform: uppercase; }}
-        td {{ padding: 12px 16px; border-bottom: 1px solid #1f2937; font-size: 0.95rem; }}
+        th {{ background: var(--surface-card); color: #ffffff; padding: 12px 16px; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid var(--surface-border); }}
+        td {{ padding: 12px 16px; border-bottom: 1px solid var(--surface-border); font-size: 0.95rem; color: #fafafa; }}
         tr:hover td {{ background: rgba(255,255,255,0.02); }}
 
         .badge {{
@@ -231,15 +232,16 @@ class HTMLReporter:
             font-weight: 700;
             text-transform: uppercase;
         }}
-        .badge-green {{ background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); }}
-        .badge-blue {{ background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); }}
-        .badge-purple {{ background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.4); }}
+        .badge-green {{ background: rgba(255, 255, 255, 0.1); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.2); }}
+        .badge-blue {{ background: rgba(228, 228, 231, 0.1); color: #e4e4e7; border: 1px solid rgba(228, 228, 231, 0.2); }}
+        .badge-purple {{ background: rgba(161, 161, 170, 0.1); color: #d4d4d8; border: 1px solid rgba(161, 161, 170, 0.2); }}
         .badge-yellow {{ background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); }}
         .badge-red {{ background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }}
-        .badge-gray {{ background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.4); }}
+        .badge-gray {{ background: rgba(161, 161, 170, 0.1); color: #a1a1aa; border: 1px solid rgba(161, 161, 170, 0.2); }}
 
         .progress-bar {{
-            background: #1e293b;
+            background: var(--surface-card);
+            border: 1px solid var(--surface-border);
             height: 8px;
             border-radius: 4px;
             overflow: hidden;
@@ -251,7 +253,8 @@ class HTMLReporter:
         .progress-fill {{ height: 100%; }}
 
         .warning-item {{
-            background: rgba(30, 41, 59, 0.5);
+            background: var(--surface-card);
+            border: 1px solid var(--surface-border);
             border-left: 4px solid var(--accent-yellow);
             padding: 14px 18px;
             border-radius: 0 8px 8px 0;
@@ -265,8 +268,8 @@ class HTMLReporter:
             margin-top: 12px;
         }}
         .meta-grid .label {{ color: var(--text-secondary); font-size: 0.85rem; display: block; }}
-        .meta-grid .val {{ color: #f8fafc; font-weight: 600; font-size: 1rem; }}
-        code {{ background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; font-size: 0.85rem; }}
+        .meta-grid .val {{ color: #ffffff; font-weight: 600; font-size: 1rem; }}
+        code {{ background: var(--surface-card); border: 1px solid var(--surface-border); padding: 2px 6px; border-radius: 4px; color: #ffffff; font-family: monospace; font-size: 0.85rem; }}
 
         footer {{ text-align: center; color: var(--text-secondary); font-size: 0.85rem; margin-top: 32px; padding: 16px; }}
         @media print {{ body {{ background: #fff; color: #000; }} header, .stat-card, .card {{ border: 1px solid #ccc; }} .actions {{ display: none; }} }}
@@ -275,9 +278,12 @@ class HTMLReporter:
 <body>
     <div class="container">
         <header>
-            <div class="header-title">
-                <h1>⚡ Hardware Gauntlet</h1>
-                <p>Host: <strong>{report.system.hostname}</strong> • Scan: {report.system.timestamp} (Duration: {report.scan_duration_seconds}s)</p>
+            <div class="header-title-box">
+                <img src="data:image/png;base64,{LOGO_WHITE_B64}" class="header-logo" alt="Hardware Gauntlet Logo" />
+                <div class="header-title">
+                    <h1>HARDWARE GAUNTLET</h1>
+                    <p>Host: <strong>{report.system.hostname}</strong> • Scan: {report.system.timestamp} (Duration: {report.scan_duration_seconds}s)</p>
+                </div>
             </div>
             <div class="header-score">
                 <div class="score-box {score_class}">
@@ -285,8 +291,8 @@ class HTMLReporter:
                     <div class="lbl">Health Score</div>
                 </div>
                 <div class="actions">
-                    <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save PDF</button>
-                    <button class="btn" onclick="downloadJSON()">💾 Export JSON</button>
+                    <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
+                    <button class="btn" onclick="downloadJSON()">Export JSON</button>
                 </div>
             </div>
         </header>

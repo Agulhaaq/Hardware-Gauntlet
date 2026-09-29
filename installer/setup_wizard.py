@@ -28,15 +28,16 @@ class SetupWizard:
         self.var_path = tk.BooleanVar(value=True)
         self.var_launch = tk.BooleanVar(value=True)
 
-        # Dark theme colors
-        self.BG = "#0b0f19"
-        self.SURFACE = "#111827"
-        self.CARD = "#1e293b"
-        self.TEXT = "#f8fafc"
-        self.TEXT_DIM = "#94a3b8"
-        self.CYAN = "#38bdf8"
-        self.GREEN = "#10b981"
-        self.BORDER = "#334155"
+        # Dark stealth monochrome color palette
+        self.BG = "#09090b"
+        self.SURFACE = "#121215"
+        self.CARD = "#18181b"
+        self.TEXT = "#ffffff"
+        self.TEXT_DIM = "#a1a1aa"
+        self.BORDER = "#27272a"
+        self.BORDER_LIGHT = "#3f3f46"
+        self.ACCENT_WHITE = "#ffffff"
+        self.ACCENT_SILVER = "#e4e4e7"
 
         self.root.configure(bg=self.BG)
 
@@ -77,8 +78,22 @@ class SetupWizard:
         # Header banner
         hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=18, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
-        tk.Label(hdr, text="⚡ Hardware Gauntlet", font=("Segoe UI", 16, "bold"), fg=self.CYAN, bg=self.SURFACE).pack(anchor="w")
-        tk.Label(hdr, text="Universal Native Hardware Diagnostic Suite - Pure Local & Offline", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.SURFACE).pack(anchor="w")
+
+        # Header logo
+        logo_path = os.path.join(self.source_dir, "assets", "logo_white_48.png")
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(self.source_dir, "assets", "logo_white.png")
+        if os.path.exists(logo_path):
+            try:
+                self._hdr_logo = tk.PhotoImage(file=logo_path)
+                tk.Label(hdr, image=self._hdr_logo, bg=self.SURFACE).pack(side=tk.LEFT, padx=(0, 14))
+            except Exception:
+                pass
+
+        hdr_text = tk.Frame(hdr, bg=self.SURFACE)
+        hdr_text.pack(side=tk.LEFT)
+        tk.Label(hdr_text, text="HARDWARE GAUNTLET", font=("Segoe UI", 16, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr_text, text="Universal Native Diagnostic Suite • Pure Local & Offline", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=28, pady=20)
         body.pack(fill=tk.BOTH, expand=True)
@@ -91,8 +106,8 @@ class SetupWizard:
 
         opt1_top = tk.Frame(opt1_frame, bg=self.CARD)
         opt1_top.pack(fill=tk.X)
-        tk.Label(opt1_top, text="⚡ Just Run (One-Off Portable Instance)", font=("Segoe UI", 11, "bold"), fg=self.CYAN, bg=self.CARD).pack(side=tk.LEFT)
-        tk.Button(opt1_top, text="Run Now 🚀", command=self.launch_portable, font=("Segoe UI", 9, "bold"), bg="#0284c7", fg="#ffffff", relief=tk.FLAT, padx=14, pady=4, cursor="hand2").pack(side=tk.RIGHT)
+        tk.Label(opt1_top, text="⚡ Just Run (One-Off Portable Instance)", font=("Segoe UI", 11, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
+        tk.Button(opt1_top, text="Run Now 🚀", command=self.launch_portable, font=("Segoe UI", 9, "bold"), bg=self.ACCENT_WHITE, fg="#09090b", activebackground=self.ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=14, pady=4, cursor="hand2").pack(side=tk.RIGHT)
 
         tk.Label(opt1_frame, text="Runs immediately in-memory without installing files, modifying registry, or requiring administrator rights.", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(6, 0))
 
@@ -102,8 +117,8 @@ class SetupWizard:
 
         opt2_top = tk.Frame(opt2_frame, bg=self.CARD)
         opt2_top.pack(fill=tk.X)
-        tk.Label(opt2_top, text="📦 Install as Application (Permanent Setup)", font=("Segoe UI", 11, "bold"), fg=self.GREEN, bg=self.CARD).pack(side=tk.LEFT)
-        tk.Button(opt2_top, text="Install >", command=self.show_options_page, font=("Segoe UI", 9, "bold"), bg="#16a34a", fg="#ffffff", relief=tk.FLAT, padx=16, pady=4, cursor="hand2").pack(side=tk.RIGHT)
+        tk.Label(opt2_top, text="📦 Install as Application (Permanent Setup)", font=("Segoe UI", 11, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
+        tk.Button(opt2_top, text="Install >", command=self.show_options_page, font=("Segoe UI", 9, "bold"), bg=self.CARD, fg=self.TEXT, activebackground=self.BORDER_LIGHT, activeforeground=self.TEXT, relief=tk.FLAT, padx=16, pady=4, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT)
 
         tk.Label(opt2_frame, text="Installs permanently to your device with Start Menu search, Desktop shortcut, and Windows Settings 'Installed apps' integration.", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(6, 0))
 
@@ -111,16 +126,16 @@ class SetupWizard:
         footer = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
 
-        tk.Button(footer, text="Exit", command=self.root.destroy, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=16, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
-        tk.Button(footer, text="⚡ Just Run Now", command=self.launch_portable, font=("Segoe UI", 9, "bold"), bg=self.CARD, fg=self.CYAN, relief=tk.FLAT, padx=14, pady=6, cursor="hand2").pack(side=tk.LEFT)
-        tk.Button(footer, text="Next: Install App >", command=self.show_options_page, font=("Segoe UI", 9, "bold"), bg="#2563eb", fg="#ffffff", relief=tk.FLAT, padx=16, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
+        tk.Button(footer, text="Exit", command=self.root.destroy, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=16, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT, padx=4)
+        tk.Button(footer, text="⚡ Just Run Now", command=self.launch_portable, font=("Segoe UI", 9, "bold"), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.LEFT)
+        tk.Button(footer, text="Next: Install App >", command=self.show_options_page, font=("Segoe UI", 9, "bold"), bg=self.ACCENT_WHITE, fg="#09090b", activebackground=self.ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=16, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
 
     def show_options_page(self):
         self.clear_page()
 
         hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=16, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
-        tk.Label(hdr, text="Choose Install Location & Options", font=("Segoe UI", 14, "bold"), fg=self.CYAN, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr, text="Choose Install Location & Options", font=("Segoe UI", 14, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=32, pady=20)
         body.pack(fill=tk.BOTH, expand=True)
@@ -129,14 +144,14 @@ class SetupWizard:
         dir_frame = tk.Frame(body, bg=self.BG)
         dir_frame.pack(fill=tk.X, pady=(6, 16))
 
-        tk.Entry(dir_frame, textvariable=self.install_dir, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, insertbackground="#fff", relief=tk.FLAT).pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=5)
+        tk.Entry(dir_frame, textvariable=self.install_dir, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, insertbackground="#fff", relief=tk.FLAT, highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=5)
 
         def browse():
             d = filedialog.askdirectory(initialdir=self.install_dir.get())
             if d:
                 self.install_dir.set(d)
 
-        tk.Button(dir_frame, text="Browse...", command=browse, font=("Segoe UI", 8), bg=self.CARD, fg=self.CYAN, relief=tk.FLAT, padx=10, pady=4, cursor="hand2").pack(side=tk.RIGHT, padx=(8, 0))
+        tk.Button(dir_frame, text="Browse...", command=browse, font=("Segoe UI", 8), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=10, pady=4, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT, padx=(8, 0))
 
         tk.Label(body, text="Integration Options:", font=("Segoe UI", 10, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(8, 6))
 
@@ -147,9 +162,9 @@ class SetupWizard:
         footer = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
 
-        tk.Button(footer, text="Cancel", command=self.root.destroy, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=14, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
-        tk.Button(footer, text="Install Now", command=self.start_installation, font=("Segoe UI", 9, "bold"), bg=self.GREEN, fg="#000000", relief=tk.FLAT, padx=16, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
-        tk.Button(footer, text="< Back", command=self.show_welcome_page, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=14, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
+        tk.Button(footer, text="Cancel", command=self.root.destroy, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT, padx=4)
+        tk.Button(footer, text="Install Now", command=self.start_installation, font=("Segoe UI", 9, "bold"), bg=self.ACCENT_WHITE, fg="#09090b", activebackground=self.ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=16, pady=6, cursor="hand2").pack(side=tk.RIGHT, padx=4)
+        tk.Button(footer, text="< Back", command=self.show_welcome_page, font=("Segoe UI", 9), bg=self.CARD, fg=self.TEXT, relief=tk.FLAT, padx=14, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=self.BORDER).pack(side=tk.RIGHT, padx=4)
 
     def start_installation(self):
         self.clear_page()
@@ -259,7 +274,7 @@ class SetupWizard:
 
         hdr = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=20, highlightthickness=1, highlightbackground=self.BORDER)
         hdr.pack(fill=tk.X)
-        tk.Label(hdr, text="✓ Installation Completed!", font=("Segoe UI", 16, "bold"), fg=self.GREEN, bg=self.SURFACE).pack(anchor="w")
+        tk.Label(hdr, text="✓ Installation Completed!", font=("Segoe UI", 16, "bold"), fg=self.ACCENT_WHITE, bg=self.SURFACE).pack(anchor="w")
 
         body = tk.Frame(self.container, bg=self.BG, padx=32, pady=24)
         body.pack(fill=tk.BOTH, expand=True)
@@ -267,7 +282,7 @@ class SetupWizard:
         tk.Label(body, text="Hardware Gauntlet has been installed successfully!", font=("Segoe UI", 12, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(0, 10))
         tk.Label(body, text=f"Installed Location:\n{self.install_dir.get()}\n\nYou can launch Hardware Gauntlet anytime from your Start Menu or Desktop.", font=("Segoe UI", 9), fg=self.TEXT_DIM, bg=self.BG, justify=tk.LEFT).pack(anchor="w", pady=(0, 16))
 
-        tk.Checkbutton(body, text="Launch Hardware Gauntlet now", variable=self.var_launch, font=("Segoe UI", 10, "bold"), fg=self.CYAN, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.CYAN).pack(anchor="w")
+        tk.Checkbutton(body, text="Launch Hardware Gauntlet now", variable=self.var_launch, font=("Segoe UI", 10, "bold"), fg=self.ACCENT_WHITE, bg=self.BG, selectcolor=self.CARD, activebackground=self.BG, activeforeground=self.ACCENT_WHITE).pack(anchor="w")
 
         footer = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
         footer.pack(fill=tk.X, side=tk.BOTTOM)
@@ -279,7 +294,7 @@ class SetupWizard:
                     subprocess.Popen([target_exe])
             self.root.destroy()
 
-        tk.Button(footer, text="Finish", command=finish, font=("Segoe UI", 9, "bold"), bg="#2563eb", fg="#ffffff", relief=tk.FLAT, padx=20, pady=6, cursor="hand2").pack(side=tk.RIGHT)
+        tk.Button(footer, text="Finish", command=finish, font=("Segoe UI", 9, "bold"), bg=self.ACCENT_WHITE, fg="#09090b", activebackground=self.ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=20, pady=6, cursor="hand2").pack(side=tk.RIGHT)
 
 
 if __name__ == "__main__":

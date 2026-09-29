@@ -47,27 +47,29 @@ class HardwareGauntletGUI:
                 pass
 
         # Dark theme color palette
-        BG_DARK = "#0b0f19"
-        SURFACE = "#111827"
-        SURFACE_CARD = "#1e293b"
-        TEXT_LIGHT = "#f8fafc"
-        TEXT_DIM = "#94a3b8"
-        CYAN = "#38bdf8"
-        GREEN = "#10b981"
-        BORDER = "#334155"
+        # Dark stealth monochrome color palette
+        BG_DARK = "#09090b"
+        SURFACE = "#121215"
+        SURFACE_CARD = "#18181b"
+        TEXT_LIGHT = "#ffffff"
+        TEXT_DIM = "#a1a1aa"
+        BORDER = "#27272a"
+        BORDER_LIGHT = "#3f3f46"
+        ACCENT_WHITE = "#ffffff"
+        ACCENT_SILVER = "#e4e4e7"
 
         root.configure(bg=BG_DARK)
 
         style = ttk.Style()
         style.theme_use("clam")
 
-        # Custom ttk styles
+        # Custom ttk styles - sleek high-contrast monochrome
         style.configure("TNotebook", background=BG_DARK, borderwidth=0)
-        style.configure("TNotebook.Tab", background=SURFACE, foreground=TEXT_DIM, padding=[16, 8], font=("Segoe UI", 10, "bold"))
-        style.map("TNotebook.Tab", background=[("selected", CYAN)], foreground=[("selected", "#000000")])
-        style.configure("Treeview", background=SURFACE_CARD, foreground=TEXT_LIGHT, fieldbackground=SURFACE_CARD, font=("Segoe UI", 10), rowheight=28)
-        style.configure("Treeview.Heading", background=SURFACE, foreground=CYAN, font=("Segoe UI", 10, "bold"))
-        style.map("Treeview", background=[("selected", "#2563eb")])
+        style.configure("TNotebook.Tab", background=SURFACE_CARD, foreground=TEXT_DIM, padding=[16, 8], font=("Segoe UI", 10, "bold"), borderwidth=1, lightcolor=BORDER, darkcolor=BORDER)
+        style.map("TNotebook.Tab", background=[("selected", ACCENT_WHITE)], foreground=[("selected", "#09090b")])
+        style.configure("Treeview", background=SURFACE, foreground=TEXT_LIGHT, fieldbackground=SURFACE, font=("Segoe UI", 10), rowheight=28, borderwidth=0)
+        style.configure("Treeview.Heading", background=SURFACE_CARD, foreground=TEXT_LIGHT, font=("Segoe UI", 10, "bold"), relief=tk.FLAT)
+        style.map("Treeview", background=[("selected", "#27272a")], foreground=[("selected", "#ffffff")])
 
         # Header Frame
         header = tk.Frame(root, bg=SURFACE, padx=24, pady=16, highlightthickness=1, highlightbackground=BORDER)
@@ -76,8 +78,24 @@ class HardwareGauntletGUI:
         title_frame = tk.Frame(header, bg=SURFACE)
         title_frame.pack(side=tk.LEFT)
 
-        tk.Label(title_frame, text="⚡ HARDWARE GAUNTLET", font=("Segoe UI", 16, "bold"), fg=CYAN, bg=SURFACE).pack(anchor="w")
-        lbl_subtitle = tk.Label(title_frame, text="Scanning local hardware components...", font=("Segoe UI", 10), fg=TEXT_DIM, bg=SURFACE)
+        # Load and display logo thumbnail if present
+        logo_path = os.path.join(base_dir, "assets", "logo_white_48.png")
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(base_dir, "assets", "logo_white.png")
+        if os.path.exists(logo_path):
+            try:
+                logo_img = tk.PhotoImage(file=logo_path)
+                root._logo_img = logo_img  # Prevent garbage collection
+                lbl_logo = tk.Label(title_frame, image=logo_img, bg=SURFACE)
+                lbl_logo.pack(side=tk.LEFT, padx=(0, 14))
+            except Exception:
+                pass
+
+        title_text_frame = tk.Frame(title_frame, bg=SURFACE)
+        title_text_frame.pack(side=tk.LEFT)
+
+        tk.Label(title_text_frame, text="HARDWARE GAUNTLET", font=("Segoe UI", 16, "bold"), fg=TEXT_LIGHT, bg=SURFACE).pack(anchor="w")
+        lbl_subtitle = tk.Label(title_text_frame, text="Scanning local hardware components...", font=("Segoe UI", 9), fg=TEXT_DIM, bg=SURFACE)
         lbl_subtitle.pack(anchor="w")
 
         # Action Buttons Frame
@@ -85,11 +103,11 @@ class HardwareGauntletGUI:
         btn_frame.pack(side=tk.RIGHT)
 
         score_val = tk.StringVar(value="...")
-        score_frame = tk.Frame(btn_frame, bg=SURFACE_CARD, padx=12, pady=6, relief=tk.RIDGE, bd=1)
+        score_frame = tk.Frame(btn_frame, bg=SURFACE_CARD, padx=14, pady=6, highlightthickness=1, highlightbackground=BORDER)
         score_frame.pack(side=tk.LEFT, padx=12)
-        lbl_score_num = tk.Label(score_frame, textvariable=score_val, font=("Segoe UI", 16, "bold"), fg=GREEN, bg=SURFACE_CARD)
+        lbl_score_num = tk.Label(score_frame, textvariable=score_val, font=("Segoe UI", 16, "bold"), fg=ACCENT_WHITE, bg=SURFACE_CARD)
         lbl_score_num.pack()
-        tk.Label(score_frame, text="HEALTH SCORE", font=("Segoe UI", 8), fg=TEXT_DIM, bg=SURFACE_CARD).pack()
+        tk.Label(score_frame, text="HEALTH SCORE", font=("Segoe UI", 8, "bold"), fg=TEXT_DIM, bg=SURFACE_CARD).pack()
 
         # Action Callbacks
         def do_refresh():
@@ -128,10 +146,10 @@ class HardwareGauntletGUI:
             except Exception as err:
                 messagebox.showerror("Tool Error", f"Unable to launch {tool_cmd}:\n{err}")
 
-        btn_refresh = tk.Button(btn_frame, text="🔄 Refresh Scan", command=do_refresh, font=("Segoe UI", 9, "bold"), bg="#1e293b", fg=TEXT_LIGHT, activebackground="#334155", activeforeground=TEXT_LIGHT, relief=tk.FLAT, padx=12, pady=6, cursor="hand2")
+        btn_refresh = tk.Button(btn_frame, text="🔄 Refresh Scan", command=do_refresh, font=("Segoe UI", 9, "bold"), bg=SURFACE_CARD, fg=TEXT_LIGHT, activebackground=BORDER_LIGHT, activeforeground=TEXT_LIGHT, relief=tk.FLAT, padx=12, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=BORDER)
         btn_refresh.pack(side=tk.LEFT, padx=4)
-        tk.Button(btn_frame, text="📄 Export HTML Report", command=do_export_html, font=("Segoe UI", 9, "bold"), bg="#2563eb", fg="#ffffff", activebackground="#1d4ed8", activeforeground="#ffffff", relief=tk.FLAT, padx=12, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
-        tk.Button(btn_frame, text="💾 Export JSON", command=do_export_json, font=("Segoe UI", 9), bg="#1e293b", fg=TEXT_LIGHT, relief=tk.FLAT, padx=10, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
+        tk.Button(btn_frame, text="📄 Export HTML Report", command=do_export_html, font=("Segoe UI", 9, "bold"), bg=ACCENT_WHITE, fg="#09090b", activebackground=ACCENT_SILVER, activeforeground="#09090b", relief=tk.FLAT, padx=14, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
+        tk.Button(btn_frame, text="💾 Export JSON", command=do_export_json, font=("Segoe UI", 9), bg=SURFACE_CARD, fg=TEXT_LIGHT, activebackground=BORDER_LIGHT, activeforeground=TEXT_LIGHT, relief=tk.FLAT, padx=10, pady=6, cursor="hand2", highlightthickness=1, highlightbackground=BORDER).pack(side=tk.LEFT, padx=4)
 
         # Main Notebook Tabs
         notebook = ttk.Notebook(root)
@@ -178,7 +196,7 @@ class HardwareGauntletGUI:
         kpi_sec_v, kpi_sec_s = create_kpi_card(kpi_grid, "Security & Boot", "Detecting...", "Secure Boot & TPM")
 
         # Diagnostics Findings
-        tk.Label(tab_overview, text="🔍 DIAGNOSTICS & HEALTH FINDINGS", font=("Segoe UI", 11, "bold"), fg=CYAN, bg=BG_DARK).pack(anchor="w", pady=(8, 4))
+        tk.Label(tab_overview, text="DIAGNOSTICS & HEALTH FINDINGS", font=("Segoe UI", 11, "bold"), fg=TEXT_LIGHT, bg=BG_DARK).pack(anchor="w", pady=(8, 4))
         tree_warn = ttk.Treeview(tab_overview, columns=("level", "category", "details"), show="headings", height=8)
         tree_warn.heading("level", text="Level")
         tree_warn.heading("category", text="Category")
@@ -238,7 +256,7 @@ class HardwareGauntletGUI:
         tree_sec.pack(fill=tk.BOTH, expand=True)
 
         # Tab 7: System Tools & Diagnostics
-        tk.Label(tab_tools, text="🛠️ SYSTEM DIAGNOSTIC SHORTCUTS", font=("Segoe UI", 12, "bold"), fg=CYAN, bg=BG_DARK).pack(anchor="w", pady=(0, 16))
+        tk.Label(tab_tools, text="SYSTEM DIAGNOSTIC SHORTCUTS", font=("Segoe UI", 12, "bold"), fg=TEXT_LIGHT, bg=BG_DARK).pack(anchor="w", pady=(0, 16))
         tools_grid = tk.Frame(tab_tools, bg=BG_DARK)
         tools_grid.pack(fill=tk.X, pady=(0, 24))
 
@@ -248,7 +266,7 @@ class HardwareGauntletGUI:
                 card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=6)
                 tk.Label(card, text=title, font=("Segoe UI", 11, "bold"), fg=TEXT_LIGHT, bg=SURFACE).pack(anchor="w")
                 tk.Label(card, text=desc, font=("Segoe UI", 8), fg=TEXT_DIM, bg=SURFACE).pack(anchor="w", pady=(2, 10))
-                tk.Button(card, text="Launch Tool", command=lambda: launch_os_tool(cmd), font=("Segoe UI", 9, "bold"), bg=SURFACE_CARD, fg=CYAN, relief=tk.FLAT, padx=10, pady=4, cursor="hand2").pack(fill=tk.X)
+                tk.Button(card, text="Launch Tool", command=lambda: launch_os_tool(cmd), font=("Segoe UI", 9, "bold"), bg=SURFACE_CARD, fg=TEXT_LIGHT, activebackground=BORDER_LIGHT, activeforeground=TEXT_LIGHT, relief=tk.FLAT, padx=10, pady=4, cursor="hand2", highlightthickness=1, highlightbackground=BORDER).pack(fill=tk.X)
 
             add_win_tool(tools_grid, "🔌 Device Manager", "Hardware drivers, controllers, PnP IDs", "devmgmt.msc")
             add_win_tool(tools_grid, "📈 Task Manager", "Live CPU threads, RAM & GPU utilization", "taskmgr.exe")
@@ -260,7 +278,7 @@ class HardwareGauntletGUI:
         # Integration & Installation Info Box
         info_box = tk.Frame(tab_tools, bg=SURFACE, padx=20, pady=20, highlightthickness=1, highlightbackground=BORDER)
         info_box.pack(fill=tk.BOTH, expand=True)
-        tk.Label(info_box, text="⚡ HARDWARE GAUNTLET LOCAL INSTALLATION STATUS", font=("Segoe UI", 11, "bold"), fg=GREEN, bg=SURFACE).pack(anchor="w")
+        tk.Label(info_box, text="HARDWARE GAUNTLET LOCAL INSTALLATION STATUS", font=("Segoe UI", 11, "bold"), fg=TEXT_LIGHT, bg=SURFACE).pack(anchor="w")
         
         install_text = (
             "• Running Mode: Native Offline Client Application (Zero Network / No Localhost Required)\n"

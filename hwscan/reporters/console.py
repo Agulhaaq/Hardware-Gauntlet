@@ -52,21 +52,21 @@ class ConsoleReporter:
         c = self.console
         
         # Header banner
-        score_color = "bright_green" if report.health_score >= 85 else ("yellow" if report.health_score >= 70 else "bright_red")
+        score_color = "bright_white" if report.health_score >= 85 else ("yellow" if report.health_score >= 70 else "bright_red")
         header_text = Text()
-        header_text.append("[*] HARDWARE GAUNTLET ", style="bold bright_cyan")
+        header_text.append("[*] HARDWARE GAUNTLET ", style="bold bright_white")
         header_text.append("- Universal System Diagnostic Suite\n", style="white")
         header_text.append(f"Host: {report.system.hostname} | OS: {report.system.os_name} ({report.system.os_arch}) | Uptime: {report.system.uptime_formatted}\n", style="dim")
         header_text.append("Health Score: ", style="bold white")
         header_text.append(f"{report.health_score} / 100", style=f"bold {score_color}")
         header_text.append(f" (Scan completed in {report.scan_duration_seconds}s)", style="dim italic")
 
-        c.print(Panel(header_text, border_style="bright_blue", box=box.ROUNDED))
+        c.print(Panel(header_text, border_style="white", box=box.ROUNDED))
 
         # 1. System & Motherboard
-        sys_table = Table(title="[System & Motherboard]", box=box.ROUNDED, show_header=True, header_style="bold bright_cyan")
+        sys_table = Table(title="[System & Motherboard]", box=box.ROUNDED, show_header=True, header_style="bold bright_white", border_style="bright_black")
         sys_table.add_column("Component", style="bold white", width=22)
-        sys_table.add_column("Specification / Value", style="green")
+        sys_table.add_column("Specification / Value", style="white")
 
         sys_table.add_row("Operating System", f"{report.system.os_name} (Build {report.system.os_build})")
         sys_table.add_row("Kernel / Boot Mode", f"{report.system.kernel} | Boot: {report.system.boot_mode}")
@@ -77,9 +77,9 @@ class ConsoleReporter:
         c.print(sys_table)
 
         # 2. CPU & Memory
-        cpu_table = Table(title="[Processor & Memory]", box=box.ROUNDED, show_header=True, header_style="bold bright_cyan")
+        cpu_table = Table(title="[Processor & Memory]", box=box.ROUNDED, show_header=True, header_style="bold bright_white", border_style="bright_black")
         cpu_table.add_column("Resource", style="bold white", width=22)
-        cpu_table.add_column("Details", style="yellow")
+        cpu_table.add_column("Details", style="white")
 
         clock_str = f"{format_hz(report.cpu.max_clock_mhz)} (Base: {format_hz(report.cpu.base_clock_mhz)})" if report.cpu.max_clock_mhz else "N/A"
         cpu_table.add_row("Processor (CPU)", report.cpu.model)
@@ -102,12 +102,12 @@ class ConsoleReporter:
 
         # 3. GPU & Displays
         if report.gpu.devices:
-            gpu_table = Table(title="[Graphics (GPU) & Displays]", box=box.ROUNDED, show_header=True, header_style="bold bright_cyan")
-            gpu_table.add_column("GPU Model", style="bold magenta", width=26)
+            gpu_table = Table(title="[Graphics (GPU) & Displays]", box=box.ROUNDED, show_header=True, header_style="bold bright_white", border_style="bright_black")
+            gpu_table.add_column("GPU Model", style="bold white", width=26)
             gpu_table.add_column("Vendor", style="white", width=12)
-            gpu_table.add_column("VRAM", style="cyan", width=14)
-            gpu_table.add_column("Driver Version", style="yellow", width=20)
-            gpu_table.add_column("Display Mode", style="green")
+            gpu_table.add_column("VRAM", style="white", width=14)
+            gpu_table.add_column("Driver Version", style="dim", width=20)
+            gpu_table.add_column("Display Mode", style="white")
 
             for dev in report.gpu.devices:
                 gpu_table.add_row(
@@ -120,12 +120,12 @@ class ConsoleReporter:
             c.print(gpu_table)
 
         # 4. Storage Disks & Partitions
-        disk_table = Table(title="[Storage Drives & Partitions]", box=box.ROUNDED, show_header=True, header_style="bold bright_cyan")
+        disk_table = Table(title="[Storage Drives & Partitions]", box=box.ROUNDED, show_header=True, header_style="bold bright_white", border_style="bright_black")
         disk_table.add_column("Drive / Mount", style="bold white", width=18)
-        disk_table.add_column("Type / Bus", style="cyan", width=16)
+        disk_table.add_column("Type / Bus", style="dim", width=16)
         disk_table.add_column("Capacity", style="white", width=12)
-        disk_table.add_column("Used / Free", style="yellow", width=22)
-        disk_table.add_column("Status / Bar", style="green")
+        disk_table.add_column("Used / Free", style="white", width=22)
+        disk_table.add_column("Status / Bar", style="white")
 
         for disk in report.storage.physical_disks:
             disk_table.add_row(
@@ -140,7 +140,7 @@ class ConsoleReporter:
             bar_len = 10
             filled = int((part.percent / 100.0) * bar_len)
             bar = "#" * filled + "-" * (bar_len - filled)
-            part_color = "red" if part.percent > 85 else ("yellow" if part.percent > 70 else "green")
+            part_color = "red" if part.percent > 85 else ("yellow" if part.percent > 70 else "white")
             disk_table.add_row(
                 f"  +- {part.mountpoint}",
                 part.fstype,
@@ -151,7 +151,7 @@ class ConsoleReporter:
         c.print(disk_table)
 
         # 5. Network & Security Summary
-        net_table = Table(title="[Network & Hardware Security]", box=box.ROUNDED, show_header=True, header_style="bold bright_cyan")
+        net_table = Table(title="[Network & Hardware Security]", box=box.ROUNDED, show_header=True, header_style="bold bright_white", border_style="bright_black")
         net_table.add_column("Subsystem", style="bold white", width=22)
         net_table.add_column("Status & Details", style="white")
 
@@ -163,9 +163,9 @@ class ConsoleReporter:
                 net_table.add_row(f"Net: {iface.name}", f"{ips} | MAC: {iface.mac_address}{speed_str}")
 
         # Security
-        sb_str = "[green]Enabled[/green]" if report.security.secure_boot else "[red]Disabled[/red]"
-        tpm_str = f"[green]Present ({report.security.tpm_version or '2.0'})[/green]" if report.security.tpm_present else "[yellow]Not detected[/yellow]"
-        virt_str = "[green]Enabled[/green]" if report.security.virtualization_enabled else "[yellow]Disabled / Unsupported[/yellow]"
+        sb_str = "[white]Enabled[/white]" if report.security.secure_boot else "[red]Disabled[/red]"
+        tpm_str = f"[white]Present ({report.security.tpm_version or '2.0'})[/white]" if report.security.tpm_present else "[yellow]Not detected[/yellow]"
+        virt_str = "[white]Enabled[/white]" if report.security.virtualization_enabled else "[yellow]Disabled / Unsupported[/yellow]"
         net_table.add_row("UEFI Secure Boot", sb_str)
         net_table.add_row("TPM 2.0 Security", tpm_str)
         net_table.add_row("Virtualization (VT/SVM)", virt_str)
