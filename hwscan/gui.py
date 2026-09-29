@@ -81,6 +81,8 @@ THEMES = {
         "tab_fg": "#a1a1aa",
         "tab_sel_bg": "#ffffff",
         "tab_sel_fg": "#08080a",
+        "capsule_bg": "#121217",
+        "capsule_border": "#252532",
         "toggle_text": "☀️ LIGHT MODE",
         "logo_file": "logo_white_48.png",
         "logo_fallback": "logo_white.png",
@@ -109,6 +111,8 @@ THEMES = {
         "pill_bg_on": "#09090b",
         "pill_knob_on": "#ffffff",
         "pill_knob_off": "#8e8e93",
+        "capsule_bg": "#f9f9fb",
+        "capsule_border": "#e2e8f0",
         "dial_bg": "#ffffff",
         "dial_active": (9, 9, 11, 255),
         "dial_inactive": (226, 232, 240, 255),
@@ -513,6 +517,158 @@ class TelemetryWaveCanvas(tk.Canvas):
         self.after(33, self._animate)  # Smooth 30 FPS tear-free
 
 
+class BubbleCapsuleStrip(tk.Canvas):
+    """Floating bubble capsule control strip matching the 'ROOM LAMP' / 'ROOM OUTLET' design in 100Days."""
+
+    def __init__(self, parent, icon: str, title: str, desc: str, initial: bool = True, on_toggle: Optional[Callable[[bool], None]] = None, height: int = 54, **kwargs):
+        super().__init__(parent, height=height, highlightthickness=0, cursor="hand2", **kwargs)
+        self.w = 380
+        self.h = height
+        self.icon = icon
+        self.title = title
+        self.desc = desc
+        self.is_on = initial
+        self.on_toggle = on_toggle
+
+        self.bg_parent = "#15151a"
+        self.capsule_bg = "#121217"
+        self.capsule_border = "#252532"
+        self.text_color = "#ffffff"
+        self.dim_color = "#a1a1aa"
+
+        self.pill_bg_off = "#202026"
+        self.pill_border_off = "#343440"
+        self.pill_bg_on = "#ffffff"
+        self.pill_knob_on = "#08080a"
+        self.pill_knob_off = "#8e8e98"
+
+        self.track_w = 46
+        self.track_h = 24
+        self.track_x = self.w - self.track_w - 18
+        self.track_y = (self.h - self.track_h) / 2.0
+
+        self._knob_min_x = self.track_x + 3.0
+        self._knob_max_x = self.track_x + 25.0
+        self._current_knob_x = self._knob_max_x if initial else self._knob_min_x
+        self._target_knob_x = self._knob_max_x if initial else self._knob_min_x
+        self._animating = False
+
+        self._bg_img: Optional[ImageTk.PhotoImage] = None
+        self._track_on_img: Optional[ImageTk.PhotoImage] = None
+        self._track_off_img: Optional[ImageTk.PhotoImage] = None
+        self._knob_on_img: Optional[ImageTk.PhotoImage] = None
+        self._knob_off_img: Optional[ImageTk.PhotoImage] = None
+
+        self.bind("<Configure>", self._on_configure)
+        self.bind("<Button-1>", self._on_click)
+        self._bake_all()
+        self.draw()
+
+    def _on_configure(self, e):
+        if e.width > 60 and e.width != self.w:
+            self.w = e.width
+            self.track_x = self.w - self.track_w - 18
+            self._knob_min_x = self.track_x + 3.0
+            self._knob_max_x = self.track_x + 25.0
+            self._current_knob_x = self._knob_max_x if self.is_on else self._knob_min_x
+            self._target_knob_x = self._knob_max_x if self.is_on else self._knob_min_x
+            self._bake_bg()
+            self.draw()
+
+    def set_theme(self, bg_parent: str, capsule_bg: str, capsule_border: str, text_color: str, dim_color: str, pill_bg_off: str, pill_border_off: str, pill_bg_on: str, knob_on: str, knob_off: str):
+        self.bg_parent = bg_parent
+        self.capsule_bg = capsule_bg
+        self.capsule_border = capsule_border
+        self.text_color = text_color
+        self.dim_color = dim_color
+        self.pill_bg_off = pill_bg_off
+        self.pill_border_off = pill_border_off
+        self.pill_bg_on = pill_bg_on
+        self.pill_knob_on = knob_on
+        self.pill_knob_off = knob_off
+        self.configure(bg=bg_parent)
+        self._bake_all()
+        self.draw()
+
+    def _bake_bg(self):
+        scale = 2
+        ws = max(10, self.w * scale)
+        hs = self.h * scale
+        rad = hs / 2.0
+        bg_im = Image.new("RGBA", (ws, hs), (0, 0, 0, 0))
+        d_bg = ImageDraw.Draw(bg_im)
+        d_bg.rounded_rectangle([1, 1, ws - 2, hs - 2], radius=rad, fill=self.capsule_bg, outline=self.capsule_border, width=scale)
+        self._bg_img = ImageTk.PhotoImage(bg_im.resize((self.w, self.h), Image.Resampling.LANCZOS))
+
+    def _bake_all(self):
+        self._bake_bg()
+        scale = 2
+        t_ws = self.track_w * scale
+        t_hs = self.track_h * scale
+
+        t_on = Image.new("RGBA", (t_ws, t_hs), (0, 0, 0, 0))
+        d_on = ImageDraw.Draw(t_on)
+        d_on.rounded_rectangle([1, 1, t_ws - 2, t_hs - 2], radius=t_hs / 2.0, fill=self.pill_bg_on)
+        self._track_on_img = ImageTk.PhotoImage(t_on.resize((self.track_w, self.track_h), Image.Resampling.LANCZOS))
+
+        t_off = Image.new("RGBA", (t_ws, t_hs), (0, 0, 0, 0))
+        d_off = ImageDraw.Draw(t_off)
+        d_off.rounded_rectangle([1, 1, t_ws - 2, t_hs - 2], radius=t_hs / 2.0, fill=self.pill_bg_off, outline=self.pill_border_off, width=scale)
+        self._track_off_img = ImageTk.PhotoImage(t_off.resize((self.track_w, self.track_h), Image.Resampling.LANCZOS))
+
+        ks = 18 * scale
+        k_on = Image.new("RGBA", (ks, ks), (0, 0, 0, 0))
+        dk_on = ImageDraw.Draw(k_on)
+        dk_on.ellipse([1, 1, ks - 2, ks - 2], fill=self.pill_knob_on)
+        self._knob_on_img = ImageTk.PhotoImage(k_on.resize((18, 18), Image.Resampling.LANCZOS))
+
+        k_off = Image.new("RGBA", (ks, ks), (0, 0, 0, 0))
+        dk_off = ImageDraw.Draw(k_off)
+        dk_off.ellipse([1, 1, ks - 2, ks - 2], fill=self.pill_knob_off)
+        self._knob_off_img = ImageTk.PhotoImage(k_off.resize((18, 18), Image.Resampling.LANCZOS))
+
+    def _on_click(self, event):
+        self.is_on = not self.is_on
+        self._target_knob_x = self._knob_max_x if self.is_on else self._knob_min_x
+        self._start_animation()
+        if self.on_toggle:
+            self.on_toggle(self.is_on)
+
+    def _start_animation(self):
+        if not self._animating:
+            self._animating = True
+            self._animate_step()
+
+    def _animate_step(self):
+        dx = self._target_knob_x - self._current_knob_x
+        if abs(dx) <= 1.5:
+            self._current_knob_x = self._target_knob_x
+            self._animating = False
+            self.draw()
+        else:
+            self._current_knob_x += dx * 0.45
+            self.draw()
+            self.after(16, self._animate_step)
+
+    def draw(self):
+        self.delete("all")
+        if self._bg_img:
+            self.create_image(0, 0, anchor="nw", image=self._bg_img)
+
+        self.create_text(28, self.h / 2.0, text=self.icon, font=("Segoe UI Emoji", 13), anchor="center")
+
+        status_text = "ACTIVE" if self.is_on else "STANDBY"
+        self.create_text(54, self.h / 2.0 - 9, text=self.title.upper(), fill=self.text_color, font=("Segoe UI", 9, "bold"), anchor="w")
+        self.create_text(54, self.h / 2.0 + 9, text=f"{status_text} • {self.desc}", fill=self.dim_color, font=("Segoe UI", 7), anchor="w")
+
+        track_img = self._track_on_img if self.is_on else self._track_off_img
+        knob_img = self._knob_on_img if self.is_on else self._knob_off_img
+        if track_img:
+            self.create_image(self.track_x, self.track_y, anchor="nw", image=track_img)
+        if knob_img:
+            self.create_image(int(round(self._current_knob_x)), self.track_y + 3, anchor="nw", image=knob_img)
+
+
 class HardwareGauntletGUI:
     """Orchestrates modern desktop application with 100Days design aesthetic."""
 
@@ -561,7 +717,8 @@ class HardwareGauntletGUI:
             "treeviews": [],
             "dials": [],
             "waves": [],
-            "pill_toggles": []
+            "pill_toggles": [],
+            "capsule_strips": []
         }
 
         style = ttk.Style()
@@ -698,25 +855,72 @@ class HardwareGauntletGUI:
         themed_widgets["pill_buttons"].append(btn_json)
 
         # -------------------------------------------------------------
-        # Main Tab Navigation
+        # Bubble Capsule Tab Navigation (Pure 100Days Pill Bar)
         # -------------------------------------------------------------
-        notebook = ttk.Notebook(root)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=(10, 18))
+        tab_bar = tk.Frame(root, padx=24, pady=(10, 8))
+        tab_bar.pack(fill=tk.X, side=tk.TOP)
+        themed_widgets["root_bg"].append(tab_bar)
 
-        def create_tab(title):
-            tab = tk.Frame(notebook, padx=18, pady=16)
-            notebook.add(tab, text=title)
-            themed_widgets["root_bg"].append(tab)
-            return tab
+        pages_container = tk.Frame(root, padx=24, pady=(0, 16))
+        pages_container.pack(fill=tk.BOTH, expand=True)
+        themed_widgets["root_bg"].append(pages_container)
 
-        tab_overview = create_tab("📊 Overview")
-        tab_stress = create_tab("🔥 Stress Test")
-        tab_cpu = create_tab("🧠 CPU & Board")
-        tab_mem = create_tab("💾 Memory")
-        tab_gpu = create_tab("🎮 Graphics")
-        tab_storage = create_tab("💽 Storage")
-        tab_security = create_tab("🔒 Security")
-        tab_tools = create_tab("🛠️ Diagnostics & Install")
+        tab_definitions = [
+            ("📊 OVERVIEW", 112),
+            ("🔥 STRESS TEST", 120),
+            ("🧠 CPU & BOARD", 122),
+            ("💾 MEMORY", 102),
+            ("🎮 GRAPHICS", 108),
+            ("💽 STORAGE", 104),
+            ("🔒 SECURITY", 104),
+            ("🛠️ UTILITIES", 106),
+        ]
+
+        tab_pages = []
+        tab_pills = []
+        active_tab_idx = [0]
+
+        def switch_tab(target_idx: int):
+            active_tab_idx[0] = target_idx
+            for i, page in enumerate(tab_pages):
+                if i == target_idx:
+                    page.pack(fill=tk.BOTH, expand=True)
+                else:
+                    page.pack_forget()
+
+            th = THEMES[self.current_theme]
+            for i, pill in enumerate(tab_pills):
+                pill.is_primary = (i == target_idx)
+                pill.set_theme(
+                    bg_parent=th["bg"],
+                    fill_primary=th["accent"],
+                    text_primary=th["accent_text"],
+                    fill_secondary=th["btn_bg"],
+                    text_secondary=th["btn_fg"],
+                    border_color=th["btn_border"]
+                )
+
+        for idx, (title, width) in enumerate(tab_definitions):
+            page_frame = tk.Frame(pages_container)
+            tab_pages.append(page_frame)
+            themed_widgets["root_bg"].append(page_frame)
+
+            pill = PillButton(tab_bar, text=title, command=lambda i=idx: switch_tab(i), width=width, height=32, is_primary=(idx == 0))
+            pill.pack(side=tk.LEFT, padx=3)
+            tab_pills.append(pill)
+            themed_widgets["pill_buttons"].append(pill)
+
+        tab_overview = tab_pages[0]
+        tab_stress = tab_pages[1]
+        tab_cpu = tab_pages[2]
+        tab_mem = tab_pages[3]
+        tab_gpu = tab_pages[4]
+        tab_storage = tab_pages[5]
+        tab_security = tab_pages[6]
+        tab_tools = tab_pages[7]
+
+        # Initially display overview
+        tab_overview.pack(fill=tk.BOTH, expand=True)
 
         # -------------------------------------------------------------
         # Tab 1: Overview with Thermostat Dial & Telemetry Wave
@@ -878,76 +1082,55 @@ class HardwareGauntletGUI:
         dial_cpu.pack(pady=4)
         themed_widgets["dials"].append((dial_cpu, "cards"))
 
-        # Controls & Pill Switches Card (matching 'ROOM LAMP', 'ROOM OUTLET' design)
-        card_controls = tk.Frame(stress_top, padx=18, pady=14, highlightthickness=1)
+        # Controls & Bubble Capsule Switches Card (matching 'ROOM LAMP', 'ROOM OUTLET' design)
+        card_controls = tk.Frame(stress_top, padx=22, pady=16, highlightthickness=1)
         card_controls.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         themed_widgets["cards"].append(card_controls)
         themed_widgets["borders"].append(card_controls)
 
-        lbl_ctrl_title = tk.Label(card_controls, text="SUBSYSTEM CONTROLS —", font=("Segoe UI", 9, "bold"))
+        lbl_ctrl_title = tk.Label(card_controls, text="SUBSYSTEM BENCHMARK CONTROLS ——", font=("Segoe UI", 9, "bold"))
         lbl_ctrl_title.pack(anchor="w")
         themed_widgets["cards"].append(lbl_ctrl_title)
         themed_widgets["text_primary"].append(lbl_ctrl_title)
 
-        lbl_ctrl_desc = tk.Label(card_controls, text="Toggle targeted subsystems for heavy torture benchmarking", font=("Segoe UI", 8))
-        lbl_ctrl_desc.pack(anchor="w", pady=(1, 10))
+        lbl_ctrl_desc = tk.Label(card_controls, text="Toggle targeted hardware pipelines for torture benchmarking", font=("Segoe UI", 8))
+        lbl_ctrl_desc.pack(anchor="w", pady=(1, 12))
         themed_widgets["cards"].append(lbl_ctrl_desc)
         themed_widgets["text_dim"].append(lbl_ctrl_desc)
 
-        var_test_cpu = tk.BooleanVar(value=True)
-        var_test_ram = tk.BooleanVar(value=True)
-        var_test_disk = tk.BooleanVar(value=True)
+        # 3 Floating Bubble Capsule Strips
+        strip_cpu = BubbleCapsuleStrip(card_controls, icon="🧠", title="CPU Multi-Core Torture", desc="Math, trigonometry & SHA-256 on all logical cores", initial=True)
+        strip_cpu.pack(fill=tk.X, pady=(0, 6))
+        themed_widgets["capsule_strips"].append(strip_cpu)
 
-        def add_pill_switch_row(parent, icon, title, desc, var):
-            row = tk.Frame(parent, pady=3)
-            row.pack(fill=tk.X)
-            themed_widgets["cards"].append(row)
+        strip_ram = BubbleCapsuleStrip(card_controls, icon="💾", title="RAM Bit-Flip Integrity", desc="1GB alternating pattern buffers (0xAA, 0x55)", initial=True)
+        strip_ram.pack(fill=tk.X, pady=(0, 6))
+        themed_widgets["capsule_strips"].append(strip_ram)
 
-            txt_box = tk.Frame(row)
-            txt_box.pack(side=tk.LEFT, anchor="w")
-            themed_widgets["cards"].append(txt_box)
+        strip_disk = BubbleCapsuleStrip(card_controls, icon="💽", title="Disk Sequential I/O", desc="Sequential write and read speed benchmark", initial=True)
+        strip_disk.pack(fill=tk.X, pady=(0, 10))
+        themed_widgets["capsule_strips"].append(strip_disk)
 
-            t = tk.Label(txt_box, text=f"{icon} {title.upper()}", font=("Segoe UI", 9, "bold"))
-            t.pack(anchor="w")
-            themed_widgets["cards"].append(t)
-            themed_widgets["text_primary"].append(t)
-
-            d = tk.Label(txt_box, text=desc, font=("Segoe UI", 7))
-            d.pack(anchor="w")
-            themed_widgets["cards"].append(d)
-            themed_widgets["text_dim"].append(d)
-
-            def on_toggle(state):
-                var.set(state)
-
-            toggle = PillToggle(row, initial=var.get(), on_toggle=on_toggle)
-            toggle.pack(side=tk.RIGHT, padx=6)
-            themed_widgets["pill_toggles"].append((toggle, "cards"))
-            return toggle
-
-        add_pill_switch_row(card_controls, "🧠", "CPU Multi-Core Torture", "Math, trigonometry & SHA-256 on all logical cores", var_test_cpu)
-        add_pill_switch_row(card_controls, "💾", "RAM Bit-Flip Integrity", "Allocates 1GB pattern buffers (0xAA, 0x55) to catch memory decay", var_test_ram)
-        add_pill_switch_row(card_controls, "💽", "Disk Sequential I/O", "Benchmarks sustained sequential write and read speeds (MB/s)", var_test_disk)
-
-        # Duration & Pill Execution buttons (matching [ POWER ] [ MODE ] [ START ])
-        stress_act_row = tk.Frame(card_controls, pady=8)
-        stress_act_row.pack(fill=tk.X, pady=(6, 0))
+        # Duration & Pill Execution buttons
+        stress_act_row = tk.Frame(card_controls)
+        stress_act_row.pack(fill=tk.X, pady=(4, 0))
         themed_widgets["cards"].append(stress_act_row)
 
-        tk.Label(stress_act_row, text="DURATION:", font=("Segoe UI", 8, "bold")).pack(side=tk.LEFT, padx=(0, 6))
-        themed_widgets["cards"].append(stress_act_row.winfo_children()[-1])
-        themed_widgets["text_dim"].append(stress_act_row.winfo_children()[-1])
+        lbl_dur = tk.Label(stress_act_row, text="DURATION:", font=("Segoe UI", 8, "bold"))
+        lbl_dur.pack(side=tk.LEFT, padx=(2, 8))
+        themed_widgets["cards"].append(lbl_dur)
+        themed_widgets["text_dim"].append(lbl_dur)
 
         combo_duration = ttk.Combobox(stress_act_row, values=["15s (Quick Check)", "30s (Standard Run)", "60s (Heavy Torture)", "120s (Burn-in)"], state="readonly", width=18)
         combo_duration.current(1)
         combo_duration.pack(side=tk.LEFT, padx=(0, 12))
 
         # Pill buttons for stress start and stop
-        btn_start_stress = PillButton(stress_act_row, text="▶ START TORTURE", width=128, height=32, is_primary=True)
+        btn_start_stress = PillButton(stress_act_row, text="▶ START TORTURE", width=132, height=32, is_primary=True)
         btn_start_stress.pack(side=tk.LEFT, padx=(0, 6))
         themed_widgets["pill_buttons"].append(btn_start_stress)
 
-        btn_stop_stress = PillButton(stress_act_row, text="⏹ STOP", width=76, height=32, is_primary=False)
+        btn_stop_stress = PillButton(stress_act_row, text="⏹ STOP", width=78, height=32, is_primary=False)
         btn_stop_stress.pack(side=tk.LEFT)
         btn_stop_stress.set_state(tk.DISABLED)
         themed_widgets["pill_buttons"].append(btn_stop_stress)
@@ -1068,9 +1251,9 @@ class HardwareGauntletGUI:
             duration_map = {0: 15, 1: 30, 2: 60, 3: 120}
             dur = duration_map.get(combo_duration.current(), 30)
 
-            c_on = var_test_cpu.get()
-            r_on = var_test_ram.get()
-            d_on = var_test_disk.get()
+            c_on = strip_cpu.is_on
+            r_on = strip_ram.is_on
+            d_on = strip_disk.is_on
 
             if not (c_on or r_on or d_on):
                 messagebox.showwarning("Selection Required", "Please select at least one subsystem to stress test.")
@@ -1347,7 +1530,14 @@ class HardwareGauntletGUI:
 
             for btn in themed_widgets["pill_buttons"]:
                 try:
-                    parent_bg = th["surface"] if btn.master == btn_frame else th["card"]
+                    if btn.master == btn_frame:
+                        parent_bg = th["surface"]
+                    elif btn.master == tab_bar:
+                        parent_bg = th["bg"]
+                    elif btn.master in themed_widgets["surface"]:
+                        parent_bg = th["surface"]
+                    else:
+                        parent_bg = th["card"]
                     btn.set_theme(
                         bg_parent=parent_bg,
                         fill_primary=th["accent"],
@@ -1395,6 +1585,23 @@ class HardwareGauntletGUI:
                     parent_bg = th[container_key] if container_key in th else th["card"]
                     toggle.set_theme(
                         bg_parent=parent_bg,
+                        pill_bg_off=th["pill_bg_off"],
+                        pill_border_off=th["pill_border_off"],
+                        pill_bg_on=th["pill_bg_on"],
+                        knob_on=th["pill_knob_on"],
+                        knob_off=th["pill_knob_off"]
+                    )
+                except Exception:
+                    pass
+
+            for strip in themed_widgets.get("capsule_strips", []):
+                try:
+                    strip.set_theme(
+                        bg_parent=th["card"],
+                        capsule_bg=th["capsule_bg"],
+                        capsule_border=th["capsule_border"],
+                        text_color=th["text"],
+                        dim_color=th["text_dim"],
                         pill_bg_off=th["pill_bg_off"],
                         pill_border_off=th["pill_border_off"],
                         pill_bg_on=th["pill_bg_on"],

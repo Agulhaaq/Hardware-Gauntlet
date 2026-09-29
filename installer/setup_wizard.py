@@ -186,30 +186,30 @@ class SetupWizard:
         tk.Label(body, text="Select your execution preference:", font=("Segoe UI", 12, "bold"), fg=self.TEXT, bg=self.BG).pack(anchor="w", pady=(0, 14))
 
         # Option 1: Run Portable
-        opt1_frame = tk.Frame(body, bg=self.CARD, padx=16, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
-        opt1_frame.pack(fill=tk.X, pady=(0, 12))
+        opt1_frame = tk.Frame(body, bg=self.CARD, padx=20, pady=16, highlightthickness=1, highlightbackground=self.BORDER)
+        opt1_frame.pack(fill=tk.X, pady=(0, 14))
 
         opt1_top = tk.Frame(opt1_frame, bg=self.CARD)
         opt1_top.pack(fill=tk.X)
-        tk.Label(opt1_top, text="⚡ Just Run (One-Off Portable Instance)", font=("Segoe UI", 10, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
-        btn_run = PillButton(opt1_top, text="⚡ RUN NOW", command=self.launch_portable, width=100, height=28, is_primary=True)
+        tk.Label(opt1_top, text="CARD 01 —— ⚡ JUST RUN (ONE-OFF INSTANCE)", font=("Segoe UI", 10, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
+        btn_run = PillButton(opt1_top, text="⚡ RUN NOW", command=self.launch_portable, width=108, height=30, is_primary=True)
         btn_run.pack(side=tk.RIGHT)
         btn_run.configure(bg=self.CARD)
 
-        tk.Label(opt1_frame, text="Runs immediately in-memory without installing files, modifying registry, or requiring administrator rights.", font=("Segoe UI", 8), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(6, 0))
+        tk.Label(opt1_frame, text="Runs immediately in-memory without installing files, modifying registry, or requiring administrator rights.", font=("Segoe UI", 8), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(8, 0))
 
         # Option 2: Install as Application
-        opt2_frame = tk.Frame(body, bg=self.CARD, padx=16, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
-        opt2_frame.pack(fill=tk.X, pady=(0, 12))
+        opt2_frame = tk.Frame(body, bg=self.CARD, padx=20, pady=16, highlightthickness=1, highlightbackground=self.BORDER)
+        opt2_frame.pack(fill=tk.X, pady=(0, 14))
 
         opt2_top = tk.Frame(opt2_frame, bg=self.CARD)
         opt2_top.pack(fill=tk.X)
-        tk.Label(opt2_top, text="📦 Install as Application (Permanent Setup)", font=("Segoe UI", 10, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
-        btn_inst = PillButton(opt2_top, text="INSTALL >", command=self.show_options_page, width=90, height=28, is_primary=False)
+        tk.Label(opt2_top, text="CARD 02 —— 📦 INSTALL AS APPLICATION (PERMANENT)", font=("Segoe UI", 10, "bold"), fg=self.ACCENT_WHITE, bg=self.CARD).pack(side=tk.LEFT)
+        btn_inst = PillButton(opt2_top, text="INSTALL >", command=self.show_options_page, width=98, height=30, is_primary=False)
         btn_inst.pack(side=tk.RIGHT)
         btn_inst.configure(bg=self.CARD)
 
-        tk.Label(opt2_frame, text="Installs permanently to your device with Start Menu search, Desktop shortcut, and Windows Settings 'Installed apps' integration.", font=("Segoe UI", 8), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(6, 0))
+        tk.Label(opt2_frame, text="Installs permanently to your device with Start Menu search, Desktop shortcut, and Windows Settings 'Installed apps' integration.", font=("Segoe UI", 8), fg=self.TEXT_DIM, bg=self.CARD, justify=tk.LEFT).pack(anchor="w", pady=(8, 0))
 
         # Bottom nav
         footer = tk.Frame(self.container, bg=self.SURFACE, padx=24, pady=14, highlightthickness=1, highlightbackground=self.BORDER)
