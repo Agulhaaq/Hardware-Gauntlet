@@ -132,8 +132,20 @@ class HTMLReporter:
             --accent-red: #ef4444;
             --accent-purple: #d4d4d8;
         }}
+        [data-theme="light"] {{
+            --bg-color: #f4f4f5;
+            --surface-color: #ffffff;
+            --surface-card: #f8fafc;
+            --surface-border: #e2e8f0;
+            --text-primary: #09090b;
+            --text-secondary: #64748b;
+            --accent-green: #09090b;
+            --accent-yellow: #d97706;
+            --accent-red: #dc2626;
+            --accent-purple: #475569;
+        }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
-        body {{ background-color: var(--bg-color); color: var(--text-primary); line-height: 1.6; padding: 24px; }}
+        body {{ background-color: var(--bg-color); color: var(--text-primary); line-height: 1.6; padding: 24px; transition: background 0.2s, color 0.2s; }}
         .container {{ max-width: 1200px; margin: 0 auto; }}
         
         header {{
@@ -291,6 +303,7 @@ class HTMLReporter:
                     <div class="lbl">Health Score</div>
                 </div>
                 <div class="actions">
+                    <button class="btn" onclick="toggleTheme()" id="themeBtn">☀️ Light Mode</button>
                     <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
                     <button class="btn" onclick="downloadJSON()">Export JSON</button>
                 </div>
@@ -452,6 +465,18 @@ class HTMLReporter:
     </script>
 
     <script>
+    function toggleTheme() {{
+        const doc = document.documentElement;
+        const btn = document.getElementById('themeBtn');
+        if (doc.getAttribute('data-theme') === 'light') {{
+            doc.removeAttribute('data-theme');
+            btn.innerText = '☀️ Light Mode';
+        }} else {{
+            doc.setAttribute('data-theme', 'light');
+            btn.innerText = '🌙 Dark Mode';
+        }}
+    }}
+
     function downloadJSON() {{
         const data = document.getElementById('report-data').textContent;
         const blob = new Blob([data], {{ type: 'application/json' }});
