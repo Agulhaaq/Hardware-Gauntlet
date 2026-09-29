@@ -1768,6 +1768,19 @@ class HardwareGauntletGUI:
             rep = self.engine.run_full_scan()
             root.after(0, update_ui_with_report, rep)
 
+        def on_window_close():
+            try:
+                self.stress_engine.stop_test()
+            except Exception:
+                pass
+            try:
+                root.destroy()
+            except Exception:
+                pass
+            os._exit(0)
+
+        root.protocol("WM_DELETE_WINDOW", on_window_close)
+
         # Apply initial dark theme
         apply_current_theme()
         root.mainloop()

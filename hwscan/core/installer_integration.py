@@ -40,7 +40,9 @@ def acquire_single_instance_lock(window_title: str = WINDOW_TITLE) -> bool:
                     user32.ShowWindow(hwnd, SW_RESTORE)
                     user32.BringWindowToTop(hwnd)
                     user32.SetForegroundWindow(hwnd)
-                return False
+                    return False
+                # No active window found (stale or orphaned mutex) — permit launch
+                return True
             return True
         except Exception:
             return True

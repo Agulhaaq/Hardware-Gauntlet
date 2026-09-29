@@ -99,6 +99,43 @@ class PillButton(tk.Canvas):
         self.create_text(self.w / 2.0, self.h / 2.0, text=self.text, fill=t_col, font=self.btn_font)
 
 
+def locate_hardware_gauntlet_exe() -> Optional[str]:
+    """Find HardwareGauntlet.exe across bundled assets, executable dir, repo root, and temp."""
+    candidates = []
+
+    # 1. Next to current running executable
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    candidates.append(os.path.join(exe_dir, "HardwareGauntlet.exe"))
+    candidates.append(os.path.join(exe_dir, "dist", "HardwareGauntlet.exe"))
+
+    # 2. PyInstaller bundle temp folder (_MEIPASS)
+    if hasattr(sys, "_MEIPASS"):
+        candidates.append(os.path.join(sys._MEIPASS, "HardwareGauntlet.exe"))
+        candidates.append(os.path.join(sys._MEIPASS, "assets", "HardwareGauntlet.exe"))
+
+    # 3. Project root / relative to __file__
+    base_file = os.path.abspath(__file__)
+    d1 = os.path.dirname(base_file)
+    d2 = os.path.dirname(d1)
+    candidates.append(os.path.join(d2, "HardwareGauntlet.exe"))
+    candidates.append(os.path.join(d2, "dist", "HardwareGauntlet.exe"))
+    candidates.append(os.path.join(d1, "HardwareGauntlet.exe"))
+
+    # 4. Current working directory
+    candidates.append(os.path.join(os.getcwd(), "HardwareGauntlet.exe"))
+    candidates.append(os.path.join(os.getcwd(), "dist", "HardwareGauntlet.exe"))
+
+    # 5. Installed app directory
+    appdata = os.environ.get("LOCALAPPDATA", "")
+    if appdata:
+        candidates.append(os.path.join(appdata, "Programs", "HardwareGauntlet", "HardwareGauntlet.exe"))
+
+    for c in candidates:
+        if os.path.isfile(c) and os.path.exists(c):
+            return os.path.abspath(c)
+    return None
+
+
 class SetupWizard:
     def __init__(self, root):
         self.root = root
@@ -108,7 +145,10 @@ class SetupWizard:
 
         # Base paths
         self.source_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if not os.path.exists(os.path.join(self.source_dir, "HardwareGauntlet.exe")):
+        found_exe = locate_hardware_gauntlet_exe()
+        if found_exe:
+            self.source_dir = os.path.dirname(found_exe)
+        elif not os.path.exists(os.path.join(self.source_dir, "HardwareGauntlet.exe")):
             self.source_dir = os.path.dirname(os.path.abspath(__file__))
 
         default_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
@@ -147,17 +187,36 @@ class SetupWizard:
             widget.destroy()
 
     def launch_portable(self):
-        target_exe = os.path.join(self.source_dir, "HardwareGauntlet.exe")
-        if os.path.exists(target_exe):
-            subprocess.Popen([target_exe], cwd=self.source_dir)
+        target_exe = locate_hardware_gauntlet_exe()
+        if target_exe:
+            # If target_exe is inside PyInstaller's _MEIPASS temp directory,
+            # copy to %TEMP%\HardwareGauntlet_Portable to avoid file locking on wizard exit
+            if hasattr(sys, "_MEIPASS") and target_exe.startswith(sys._MEIPASS):
+                import tempfile
+                temp_run_dir = os.path.join(tempfile.gettempdir(), "HardwareGauntlet_Portable")
+                os.makedirs(temp_run_dir, exist_ok=True)
+                portable_exe = os.path.join(temp_run_dir, "HardwareGauntlet.exe")
+                try:
+                    shutil.copy2(target_exe, portable_exe)
+                    target_exe = portable_exe
+                except Exception:
+                    pass
+
+            run_cwd = os.path.dirname(target_exe)
+            subprocess.Popen([target_exe], cwd=run_cwd)
             self.root.destroy()
             return
+
         gui_py = os.path.join(self.source_dir, "hwscan", "gui.py")
         if os.path.exists(gui_py):
             subprocess.Popen([sys.executable, "-m", "hwscan.gui"], cwd=self.source_dir)
             self.root.destroy()
             return
-        messagebox.showerror("Error", f"Executable not found at:\n{target_exe}")
+
+        messagebox.showerror(
+            "Executable Not Found",
+            "HardwareGauntlet.exe could not be located.\n\nPlease ensure HardwareGauntlet.exe is in the application folder."
+        )
 
     def show_welcome_page(self):
         self.clear_page()
@@ -303,8 +362,8 @@ class SetupWizard:
             self.progress["value"] = 25
 
             self.lbl_status.config(text="Copying application binaries and resources...")
-            exe_src = os.path.join(self.source_dir, "HardwareGauntlet.exe")
-            if os.path.exists(exe_src):
+            exe_src = locate_hardware_gauntlet_exe()
+            if exe_src and os.path.exists(exe_src):
                 shutil.copy2(exe_src, os.path.join(target, "HardwareGauntlet.exe"))
 
             cli_src = os.path.join(self.source_dir, "dist", "hwscan-windows-x64.exe")

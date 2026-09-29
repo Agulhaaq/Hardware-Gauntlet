@@ -4,7 +4,7 @@
 a = Analysis(
     ['installer/setup_wizard.py'],
     pathex=[],
-    datas=[('assets', 'assets')],
+    datas=[('assets', 'assets'), ('HardwareGauntlet.exe', '.')],
     hiddenimports=['PIL'],
     hookspath=[],
     hooksconfig={},
