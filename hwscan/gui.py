@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import subprocess
 import webbrowser
 import threading
 from typing import Optional
@@ -24,43 +25,7 @@ class HardwareGauntletGUI:
 
     def run(self, prefer_engine: str = "auto") -> None:
         """Launch the native desktop application window."""
-        if prefer_engine == "webview":
-            try:
-                import webview
-                self.current_report = self.engine.run_full_scan()
-                self._run_webview(webview)
-                return
-            except Exception:
-                pass
-
-        # Standard Tkinter engine: instantaneous launch and 100% cross-platform stability
         self._run_tkinter()
-
-    def _run_webview(self, webview_module) -> None:
-        """Render high-fidelity desktop window via pywebview."""
-        from hwscan.web.server import PORTAL_HTML
-
-        report = self.current_report
-        html = PORTAL_HTML
-        html = html.replace("{{HOSTNAME}}", report.system.hostname)
-        html = html.replace("{{OS_NAME}}", f"{report.system.os_name} ({report.system.os_arch})")
-        html = html.replace("{{CPU_MODEL}}", report.cpu.model)
-        html = html.replace("{{RAM_INFO}}", f"{report.memory.percent}% used of {format_bytes(report.memory.total_bytes)}")
-        gpu_str = report.gpu.devices[0].name if report.gpu.devices else "Integrated Graphics"
-        html = html.replace("{{GPU_INFO}}", gpu_str)
-        html = html.replace("{{HEALTH_SCORE}}", str(report.health_score))
-        sec_str = "Secure Boot OK" if report.security.secure_boot else "Standard"
-        html = html.replace("{{SECURITY_INFO}}", sec_str)
-
-        window = webview_module.create_window(
-            title="Hardware Gauntlet - Universal Hardware Diagnostic Suite",
-            html=html,
-            width=1180,
-            height=820,
-            min_size=(900, 600),
-            background_color="#0b0f19"
-        )
-        webview_module.start()
 
     def _run_tkinter(self) -> None:
         """Render native Tkinter dark-theme GUI with instant non-blocking launch."""
@@ -68,9 +33,18 @@ class HardwareGauntletGUI:
         from tkinter import ttk, messagebox, filedialog
 
         root = tk.Tk()
-        root.title("Hardware Gauntlet - Universal Hardware Diagnostic Suite")
-        root.geometry("1100x750")
-        root.minsize(850, 600)
+        root.title("Hardware Gauntlet - Hardware Diagnostic Suite")
+        root.geometry("1120x760")
+        root.minsize(880, 620)
+
+        # Set window icon if available
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ico_path = os.path.join(base_dir, "assets", "app.ico")
+        if sys.platform == "win32" and os.path.exists(ico_path):
+            try:
+                root.iconbitmap(ico_path)
+            except Exception:
+                pass
 
         # Dark theme color palette
         BG_DARK = "#0b0f19"
@@ -128,12 +102,12 @@ class HardwareGauntletGUI:
                 return
             f = filedialog.asksaveasfilename(
                 defaultextension=".html",
-                filetypes=[("HTML Files", "*.html")],
+                filetypes=[("HTML Diagnostic Report", "*.html")],
                 initialfile=f"hardware-report-{self.current_report.system.hostname}.html"
             )
             if f:
                 self.html_reporter.write_file(self.current_report, f)
-                if messagebox.askyesno("Report Saved", f"HTML Report saved successfully!\nOpen it in your browser?"):
+                if messagebox.askyesno("Report Saved", f"Offline HTML report saved successfully to:\n{f}\n\nWould you like to open it?"):
                     webbrowser.open(f)
 
         def do_export_json():
@@ -141,23 +115,23 @@ class HardwareGauntletGUI:
                 return
             f = filedialog.asksaveasfilename(
                 defaultextension=".json",
-                filetypes=[("JSON Files", "*.json")],
+                filetypes=[("JSON Hardware Data", "*.json")],
                 initialfile=f"hardware-report-{self.current_report.system.hostname}.json"
             )
             if f:
                 self.json_reporter.write_file(self.current_report, f)
-                messagebox.showinfo("JSON Saved", f"JSON report saved to {f}")
+                messagebox.showinfo("JSON Saved", f"Machine-readable JSON report saved to:\n{f}")
 
-        def do_launch_web():
-            from hwscan.web.server import start_server
-            threading.Thread(target=start_server, kwargs={"port": 8080}, daemon=True).start()
-            webbrowser.open("http://localhost:8080")
+        def launch_os_tool(tool_cmd):
+            try:
+                subprocess.Popen(tool_cmd, shell=True)
+            except Exception as err:
+                messagebox.showerror("Tool Error", f"Unable to launch {tool_cmd}:\n{err}")
 
         btn_refresh = tk.Button(btn_frame, text="🔄 Refresh Scan", command=do_refresh, font=("Segoe UI", 9, "bold"), bg="#1e293b", fg=TEXT_LIGHT, activebackground="#334155", activeforeground=TEXT_LIGHT, relief=tk.FLAT, padx=12, pady=6, cursor="hand2")
         btn_refresh.pack(side=tk.LEFT, padx=4)
-        tk.Button(btn_frame, text="📄 Export HTML", command=do_export_html, font=("Segoe UI", 9, "bold"), bg="#2563eb", fg="#ffffff", activebackground="#1d4ed8", activeforeground="#ffffff", relief=tk.FLAT, padx=12, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
+        tk.Button(btn_frame, text="📄 Export HTML Report", command=do_export_html, font=("Segoe UI", 9, "bold"), bg="#2563eb", fg="#ffffff", activebackground="#1d4ed8", activeforeground="#ffffff", relief=tk.FLAT, padx=12, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
         tk.Button(btn_frame, text="💾 Export JSON", command=do_export_json, font=("Segoe UI", 9), bg="#1e293b", fg=TEXT_LIGHT, relief=tk.FLAT, padx=10, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
-        tk.Button(btn_frame, text="🌐 Web Portal", command=do_launch_web, font=("Segoe UI", 9), bg="#1e293b", fg=CYAN, relief=tk.FLAT, padx=10, pady=6, cursor="hand2").pack(side=tk.LEFT, padx=4)
 
         # Main Notebook Tabs
         notebook = ttk.Notebook(root)
@@ -178,8 +152,11 @@ class HardwareGauntletGUI:
         tab_storage = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
         notebook.add(tab_storage, text="💽 Drives & Partitions")
 
-        tab_downloads = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
-        notebook.add(tab_downloads, text="📥 Downloads Per OS")
+        tab_security = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
+        notebook.add(tab_security, text="🔒 Security & Network")
+
+        tab_tools = tk.Frame(notebook, bg=BG_DARK, padx=16, pady=16)
+        notebook.add(tab_tools, text="🛠️ System Diagnostics & Tools")
 
         # Overview KPI Cards
         kpi_grid = tk.Frame(tab_overview, bg=BG_DARK)
@@ -250,56 +227,48 @@ class HardwareGauntletGUI:
         tree_storage.heading("percent", text="Utilization")
         tree_storage.pack(fill=tk.BOTH, expand=True)
 
-        # Tab 6: Downloads Per OS Card Grid
-        tk.Label(tab_downloads, text="⚡ DOWNLOAD & RUN HARDWARE GAUNTLET FOR ALL PLATFORMS", font=("Segoe UI", 12, "bold"), fg=CYAN, bg=BG_DARK).pack(anchor="w", pady=(0, 16))
+        # Tab 6: Security & Network Tree
+        tree_sec = ttk.Treeview(tab_security, columns=("component", "status", "details"), show="headings")
+        tree_sec.heading("component", text="Component")
+        tree_sec.heading("status", text="Status")
+        tree_sec.heading("details", text="Technical Details")
+        tree_sec.column("component", width=220)
+        tree_sec.column("status", width=180)
+        tree_sec.column("details", width=600)
+        tree_sec.pack(fill=tk.BOTH, expand=True)
 
-        dl_cards_frame = tk.Frame(tab_downloads, bg=BG_DARK)
-        dl_cards_frame.pack(fill=tk.BOTH, expand=True)
+        # Tab 7: System Tools & Diagnostics
+        tk.Label(tab_tools, text="🛠️ SYSTEM DIAGNOSTIC SHORTCUTS", font=("Segoe UI", 12, "bold"), fg=CYAN, bg=BG_DARK).pack(anchor="w", pady=(0, 16))
+        tools_grid = tk.Frame(tab_tools, bg=BG_DARK)
+        tools_grid.pack(fill=tk.X, pady=(0, 24))
 
-        def create_os_download_card(parent, icon, title, desc, dl_url, run_cmd):
-            card = tk.Frame(parent, bg=SURFACE, padx=20, pady=20, highlightthickness=1, highlightbackground=BORDER)
-            card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=8)
+        if sys.platform == "win32":
+            def add_win_tool(parent, title, desc, cmd):
+                card = tk.Frame(parent, bg=SURFACE, padx=16, pady=16, highlightthickness=1, highlightbackground=BORDER)
+                card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=6)
+                tk.Label(card, text=title, font=("Segoe UI", 11, "bold"), fg=TEXT_LIGHT, bg=SURFACE).pack(anchor="w")
+                tk.Label(card, text=desc, font=("Segoe UI", 8), fg=TEXT_DIM, bg=SURFACE).pack(anchor="w", pady=(2, 10))
+                tk.Button(card, text="Launch Tool", command=lambda: launch_os_tool(cmd), font=("Segoe UI", 9, "bold"), bg=SURFACE_CARD, fg=CYAN, relief=tk.FLAT, padx=10, pady=4, cursor="hand2").pack(fill=tk.X)
 
-            tk.Label(card, text=f"{icon} {title}", font=("Segoe UI", 14, "bold"), fg=TEXT_LIGHT, bg=SURFACE).pack(anchor="w")
-            tk.Label(card, text=desc, font=("Segoe UI", 9), fg=TEXT_DIM, bg=SURFACE).pack(anchor="w", pady=(2, 12))
+            add_win_tool(tools_grid, "🔌 Device Manager", "Hardware drivers, controllers, PnP IDs", "devmgmt.msc")
+            add_win_tool(tools_grid, "📈 Task Manager", "Live CPU threads, RAM & GPU utilization", "taskmgr.exe")
+            add_win_tool(tools_grid, "💾 Disk Management", "Partitions, volumes, drive formatting", "diskmgmt.msc")
+            add_win_tool(tools_grid, "ℹ️ System Info", "MSInfo32 BIOS & hardware resources", "msinfo32.exe")
+        else:
+            tk.Label(tools_grid, text="Platform tools available natively in your desktop system menu.", fg=TEXT_DIM, bg=BG_DARK).pack(anchor="w")
 
-            def open_download():
-                webbrowser.open(dl_url)
-
-            def copy_cmd():
-                root.clipboard_clear()
-                root.clipboard_append(run_cmd)
-                messagebox.showinfo("Copied", f"Command copied to clipboard:\n\n{run_cmd}")
-
-            tk.Button(card, text="⬇️ Download Binary", command=open_download, font=("Segoe UI", 9, "bold"), bg="#2563eb", fg="#ffffff", padx=12, pady=6, relief=tk.FLAT, cursor="hand2").pack(fill=tk.X, pady=(0, 8))
-            tk.Button(card, text="📋 Copy 1-Line Run Command", command=copy_cmd, font=("Segoe UI", 8), bg=SURFACE_CARD, fg=CYAN, padx=8, pady=4, relief=tk.FLAT, cursor="hand2").pack(fill=tk.X)
-
-            cmd_box = tk.Label(card, text=run_cmd, font=("Consolas", 8), fg="#7dd3fc", bg="#090d16", wraplength=260, justify=tk.LEFT, padx=6, pady=6)
-            cmd_box.pack(fill=tk.X, pady=(8, 0))
-
-        create_os_download_card(
-            dl_cards_frame,
-            "🪟", "Windows (x64 / ARM)",
-            "Single standalone .exe binary with WMI & CIM hardware telemetry.",
-            "https://github.com/Agulhaaq/Hardware-Gauntlet/releases/latest/download/hwscan-windows-x64.exe",
-            "irm https://raw.githubusercontent.com/Agulhaaq/Hardware-Gauntlet/main/distribution/install.ps1 | iex"
+        # Integration & Installation Info Box
+        info_box = tk.Frame(tab_tools, bg=SURFACE, padx=20, pady=20, highlightthickness=1, highlightbackground=BORDER)
+        info_box.pack(fill=tk.BOTH, expand=True)
+        tk.Label(info_box, text="⚡ HARDWARE GAUNTLET LOCAL INSTALLATION STATUS", font=("Segoe UI", 11, "bold"), fg=GREEN, bg=SURFACE).pack(anchor="w")
+        
+        install_text = (
+            "• Running Mode: Native Offline Client Application (Zero Network / No Localhost Required)\n"
+            "• Scanning Architecture: In-Memory Parallel Threaded Hardware Diagnostic Engine\n"
+            "• Export Engine: Self-contained HTML and JSON reports saved directly to your local filesystem\n"
+            "• Windows Start Menu & Desktop Integration: Available via setup installer"
         )
-
-        create_os_download_card(
-            dl_cards_frame,
-            "🍎", "macOS (Apple / Intel)",
-            "Universal binary for Apple Silicon (M1-M4) & Intel Macs with IOKit.",
-            "https://github.com/Agulhaaq/Hardware-Gauntlet/releases/latest/download/hwscan-macos-universal",
-            "curl -fsSL https://raw.githubusercontent.com/Agulhaaq/Hardware-Gauntlet/main/distribution/install.sh | bash"
-        )
-
-        create_os_download_card(
-            dl_cards_frame,
-            "🐧", "Linux (Ubuntu / Fedora)",
-            "Linux binary compatible with all distros via /proc & DMI parsing.",
-            "https://github.com/Agulhaaq/Hardware-Gauntlet/releases/latest/download/hwscan-linux-x64",
-            "curl -fsSL https://raw.githubusercontent.com/Agulhaaq/Hardware-Gauntlet/main/distribution/install.sh | bash"
-        )
+        tk.Label(info_box, text=install_text, font=("Segoe UI", 9), fg=TEXT_LIGHT, bg=SURFACE, justify=tk.LEFT).pack(anchor="w", pady=(8, 0))
 
         # Thread-safe UI update
         def update_ui_with_report(report):
@@ -370,6 +339,18 @@ class HardwareGauntletGUI:
                 tree_storage.insert("", tk.END, values=(f"[Physical] {d.model}", d.media_type, d.size_formatted, d.interface_type, d.smart_status, "Physical Drive"))
             for p in report.storage.partitions:
                 tree_storage.insert("", tk.END, values=(p.mountpoint, p.fstype, p.total_formatted, p.used_formatted, p.free_formatted, f"{p.percent}%"))
+
+            # Security & Network
+            tree_sec.delete(*tree_sec.get_children())
+            tree_sec.insert("", tk.END, values=("UEFI Secure Boot", "Enabled" if report.security.secure_boot else "Disabled", "Protects boot integrity against unauthorized bootloaders and rootkits"))
+            tree_sec.insert("", tk.END, values=("TPM 2.0 Security", "Active" if report.security.tpm_present else "Not Detected", f"Spec: {report.security.tpm_version or '2.0'} - Hardware cryptography and BitLocker anchor"))
+            tree_sec.insert("", tk.END, values=("Virtualization (VT-x/AMD-V)", "Enabled" if report.security.virtualization_enabled else "Disabled", "Hardware virtualization enabled in BIOS/firmware for WSL2, Hyper-V, and VMs"))
+
+            for iface in report.network.interfaces:
+                if iface.is_up or iface.ipv4:
+                    status = "CONNECTED" if iface.is_up else "DISCONNECTED"
+                    ips = ", ".join(iface.ipv4) if iface.ipv4 else "No IPv4"
+                    tree_sec.insert("", tk.END, values=(f"Net: {iface.name}", status, f"MAC: {iface.mac_address} | IP: {ips} | Speed: {iface.speed_mbps} Mbps"))
 
         def run_background_scan():
             rep = self.engine.run_full_scan()

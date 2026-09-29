@@ -7,11 +7,42 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 [![Build & Release](https://github.com/Agulhaaq/Hardware-Gauntlet/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/Agulhaaq/Hardware-Gauntlet/actions)
 
-Hardware Gauntlet is a high-performance system hardware audit and diagnostic suite that extracts deep hardware telemetry across every major desktop, laptop, and server platform without external dependencies.
+Hardware Gauntlet is a high-performance system hardware audit and diagnostic suite that runs as a **full permanent native desktop application** or command-line tool across Windows, macOS, and Linux without external web servers or localhost dependencies.
 
 ---
 
-## 🚀 Instant 1-Command Run Per Operating System
+## ⚡ Native Desktop Application Installation
+
+Hardware Gauntlet installs permanently onto your system with Start Menu, Desktop shortcuts, system PATH registration, and Settings / Add & Remove Programs integration.
+
+### 🪟 Windows (Native Setup Wizard or 1-Click Installer)
+- **GUI Setup Wizard**: Run `Setup-HardwareGauntlet.exe` for an interactive installation wizard.
+- **1-Click Batch Installer**: Double-click `Install-HardwareGauntlet.bat` or run:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\installer\install-windows.ps1
+  ```
+  *Features:*
+  - Installs to `%LOCALAPPDATA%\Programs\HardwareGauntlet`
+  - Creates Desktop & Start Menu shortcuts (searchable in Windows Search)
+  - Registers in **Windows Settings > Apps > Installed apps** for clean uninstallation
+  - Adds `hwscan` to User `PATH` for instant terminal access anywhere
+  - Includes offline diagnostic shortcuts (Device Manager, Task Manager, Disk Management, MSInfo32)
+
+### 🐧 Linux (Native Desktop App)
+```bash
+bash installer/install-linux.sh
+```
+*Installs binary to `~/.local/bin` (or `/usr/local/bin`), creates `.desktop` launcher in applications menu, and links system icons.*
+
+### 🍎 macOS (Application Bundle)
+```bash
+bash installer/install-macos.sh
+```
+*Installs `Hardware Gauntlet.app` into `/Applications` with full Spotlight search and Dock support.*
+
+---
+
+## 🚀 Instant 1-Command CLI Run Per Operating System
 
 Run directly in your terminal without manual cloning or configuration:
 
