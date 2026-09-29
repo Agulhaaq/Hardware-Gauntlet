@@ -1,14 +1,12 @@
-"""Native Desktop GUI Application for Hardware Gauntlet with 100Days Design Aesthetic.
+"""Native Desktop GUI Application for Hardware Gauntlet with Ultra-Smooth Anti-Aliased 100Days Aesthetic.
 
-Features:
-- Thermostat-style circular radial tick dials (matching 26°C thermostat)
-- Smooth capsule pill buttons (PillButton) matching [ POWER ], [ MODE ], [ DONE ]
-- Pill toggle switches (PillToggle) matching [ ROOM LAMP ] / [ ROOM OUTLET ]
-- Dynamic telemetry waveform curve (TelemetryWaveCanvas) matching upper-right card
-- Modular cards with stylized dashes ('YOUR SYSTEM —', 'CARD 01 —', 'THERMAL DIAL —')
-- Duotone monochrome palette (pure Obsidian & crisp Slate) with instant theme switcher
-- Strict Win32 named Mutex single-instance enforcement
-- On-demand manual hardware scan (never auto-runs on launch)
+Engineered with:
+- Retina-grade supersampled (Lanczos) anti-aliased radial dials (matching 26°C thermostat)
+- Smooth anti-aliased capsule pill buttons (PillButton) with zero polygon distortion
+- Smooth animated sliding pill toggle switches (PillToggle)
+- High-framerate tear-free in-place telemetry wave spline (TelemetryWaveCanvas)
+- Minimalist duotone monochrome styling (Obsidian & crisp Slate)
+- Single-instance mutex enforcement & manual scan execution
 """
 
 import os
@@ -20,6 +18,8 @@ import subprocess
 import webbrowser
 import threading
 from typing import Optional, Dict, Any, Callable, List, Tuple
+
+from PIL import Image, ImageDraw, ImageTk
 
 from hwscan.core.system_info import HardwareScannerEngine
 from hwscan.reporters.html_reporter import HTMLReporter
@@ -42,43 +42,45 @@ from tkinter import ttk, messagebox, filedialog
 THEMES = {
     "dark": {
         "name": "dark",
-        "bg": "#09090b",
-        "surface": "#111114",
-        "card": "#16161a",
-        "card_alt": "#1e1e24",
-        "border": "#27272e",
-        "border_subtle": "#1d1d22",
-        "border_light": "#383842",
+        "bg": "#08080a",
+        "surface": "#101014",
+        "card": "#15151a",
+        "card_alt": "#1c1c22",
+        "border": "#25252e",
+        "border_subtle": "#1a1a20",
+        "border_light": "#363644",
         "text": "#ffffff",
         "text_dim": "#a1a1aa",
         "text_muted": "#71717a",
         "accent": "#ffffff",
-        "accent_text": "#09090b",
+        "accent_text": "#08080a",
         "accent_hover": "#e4e4e7",
-        "btn_bg": "#1e1e24",
+        "btn_bg": "#1c1c22",
         "btn_fg": "#ffffff",
-        "btn_border": "#2c2c34",
-        "btn_hover": "#282830",
-        "pill_bg": "#23232a",
-        "pill_active": "#ffffff",
-        "pill_knob": "#09090b",
-        "dial_bg": "#16161a",
-        "dial_active": "#ffffff",
-        "dial_inactive": "#27272e",
+        "btn_border": "#2a2a34",
+        "btn_hover": "#262630",
+        "pill_bg_off": "#202026",
+        "pill_border_off": "#343440",
+        "pill_bg_on": "#ffffff",
+        "pill_knob_on": "#08080a",
+        "pill_knob_off": "#8e8e98",
+        "dial_bg": "#15151a",
+        "dial_active": (255, 255, 255, 255),
+        "dial_inactive": (38, 38, 48, 255),
         "wave_color": "#ffffff",
         "console_bg": "#0c0c0e",
         "console_fg": "#e4e4e7",
-        "tree_bg": "#111114",
+        "tree_bg": "#101014",
         "tree_fg": "#ffffff",
-        "tree_alt": "#141418",
-        "tree_head_bg": "#18181d",
+        "tree_alt": "#131318",
+        "tree_head_bg": "#17171d",
         "tree_head_fg": "#ffffff",
-        "tree_sel_bg": "#27272e",
+        "tree_sel_bg": "#25252e",
         "tree_sel_fg": "#ffffff",
-        "tab_bg": "#18181d",
+        "tab_bg": "#17171d",
         "tab_fg": "#a1a1aa",
         "tab_sel_bg": "#ffffff",
-        "tab_sel_fg": "#09090b",
+        "tab_sel_fg": "#08080a",
         "toggle_text": "☀️ LIGHT MODE",
         "logo_file": "logo_white_48.png",
         "logo_fallback": "logo_white.png",
@@ -88,7 +90,7 @@ THEMES = {
         "bg": "#f5f5f7",
         "surface": "#ffffff",
         "card": "#ffffff",
-        "card_alt": "#f0f0f3",
+        "card_alt": "#f0f0f4",
         "border": "#e5e5ea",
         "border_subtle": "#ededf2",
         "border_light": "#d1d1d6",
@@ -102,12 +104,14 @@ THEMES = {
         "btn_fg": "#0f172a",
         "btn_border": "#e2e8f0",
         "btn_hover": "#f1f5f9",
-        "pill_bg": "#e2e8f0",
-        "pill_active": "#09090b",
-        "pill_knob": "#ffffff",
+        "pill_bg_off": "#e5e5ea",
+        "pill_border_off": "#d1d1d6",
+        "pill_bg_on": "#09090b",
+        "pill_knob_on": "#ffffff",
+        "pill_knob_off": "#8e8e93",
         "dial_bg": "#ffffff",
-        "dial_active": "#09090b",
-        "dial_inactive": "#e2e8f0",
+        "dial_active": (9, 9, 11, 255),
+        "dial_inactive": (226, 232, 240, 255),
         "wave_color": "#09090b",
         "console_bg": "#f8fafc",
         "console_fg": "#0f172a",
@@ -151,10 +155,21 @@ def get_asset_file_path(filename: str) -> str:
     return os.path.join(repo_root, "assets", filename)
 
 
-class PillButton(tk.Canvas):
-    """Pill-shaped capsule button matching 100Days design aesthetic."""
+def create_smooth_pill_img(w: int, h: int, fill_color: str, border_color: Optional[str] = None, scale: int = 2) -> Image.Image:
+    """Render a pixel-perfect, anti-aliased pill capsule with Lanczos downsampling."""
+    ws = w * scale
+    hs = h * scale
+    rad = hs / 2.0
+    im = Image.new("RGBA", (ws, hs), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([1, 1, ws - 2, hs - 2], radius=rad, fill=fill_color, outline=border_color, width=scale if border_color else 0)
+    return im.resize((w, h), Image.Resampling.LANCZOS)
 
-    def __init__(self, parent, text="BUTTON", command=None, width=120, height=34, is_primary=True, font=("Segoe UI", 8, "bold"), **kwargs):
+
+class PillButton(tk.Canvas):
+    """Ultra-smooth anti-aliased capsule pill button using supersampled PIL textures."""
+
+    def __init__(self, parent, text="BUTTON", command=None, width=120, height=32, is_primary=True, font=("Segoe UI", 8, "bold"), **kwargs):
         super().__init__(parent, width=width, height=height, highlightthickness=0, cursor="hand2", **kwargs)
         self.text = text
         self.command = command
@@ -163,33 +178,57 @@ class PillButton(tk.Canvas):
         self.is_primary = is_primary
         self.btn_font = font
         self.state = tk.NORMAL
-        self.bg_parent = "#111114"
-        self.fill_color = "#ffffff" if is_primary else "#1e1e24"
-        self.text_color = "#09090b" if is_primary else "#ffffff"
-        self.hover_color = "#e4e4e7" if is_primary else "#282830"
-        self.border_color = "#ffffff" if is_primary else "#2c2c34"
+
+        self.bg_parent = "#101014"
+        self.fill_color = "#ffffff" if is_primary else "#1c1c22"
+        self.text_color = "#08080a" if is_primary else "#ffffff"
+        self.hover_color = "#e4e4e7" if is_primary else "#262630"
+        self.border_color = "#ffffff" if is_primary else "#2a2a34"
         self._is_hovered = False
+
+        self._img_norm: Optional[ImageTk.PhotoImage] = None
+        self._img_hover: Optional[ImageTk.PhotoImage] = None
+        self._img_disabled: Optional[ImageTk.PhotoImage] = None
+
+        self._bg_img_id = None
+        self._text_id = None
+
         self.bind("<Enter>", self._on_enter)
         self.bind("<Leave>", self._on_leave)
         self.bind("<Button-1>", self._on_click)
+        self._bake_images()
         self.draw()
 
-    def set_theme(self, bg_parent, fill_primary, text_primary, fill_secondary, text_secondary, border_color):
+    def set_theme(self, bg_parent: str, fill_primary: str, text_primary: str, fill_secondary: str, text_secondary: str, border_color: str):
         self.bg_parent = bg_parent
         self.configure(bg=bg_parent)
         if self.is_primary:
             self.fill_color = fill_primary
             self.text_color = text_primary
+            self.hover_color = "#e4e4e7" if fill_primary == "#ffffff" else "#27272a"
             self.border_color = fill_primary
         else:
             self.fill_color = fill_secondary
             self.text_color = text_secondary
+            self.hover_color = "#282832" if fill_secondary == "#1c1c22" else "#f1f5f9"
             self.border_color = border_color
+        self._bake_images()
         self.draw()
+
+    def _bake_images(self):
+        norm_raw = create_smooth_pill_img(self.w, self.h, self.fill_color, self.border_color if not self.is_primary else None)
+        self._img_norm = ImageTk.PhotoImage(norm_raw)
+
+        hover_raw = create_smooth_pill_img(self.w, self.h, self.hover_color, self.border_color if not self.is_primary else None)
+        self._img_hover = ImageTk.PhotoImage(hover_raw)
+
+        dis_raw = create_smooth_pill_img(self.w, self.h, "#22222a" if not self.is_primary else "#3f3f46", None)
+        self._img_disabled = ImageTk.PhotoImage(dis_raw)
 
     def set_text(self, new_text: str):
         self.text = new_text
-        self.draw()
+        if self._text_id:
+            self.itemconfig(self._text_id, text=new_text)
 
     def set_state(self, state: str):
         self.state = state
@@ -211,31 +250,22 @@ class PillButton(tk.Canvas):
 
     def draw(self):
         self.delete("all")
-        rad = (self.h / 2.0) - 2
-        pts = [
-            rad + 2, 2,
-            self.w - rad - 2, 2,
-            self.w - 2, 2,
-            self.w - 2, 2 + rad,
-            self.w - 2, self.h - rad - 2,
-            self.w - 2, self.h - 2,
-            self.w - rad - 2, self.h - 2,
-            rad + 2, self.h - 2,
-            2, self.h - 2,
-            2, self.h - rad - 2,
-            2, 2 + rad,
-            2, 2
-        ]
-        col = self.hover_color if self._is_hovered else self.fill_color
         if self.state == tk.DISABLED:
-            col = "#27272e"
-        self.create_polygon(pts, smooth=True, fill=col, outline=self.border_color if not self.is_primary else "", width=1)
-        txt_col = self.text_color if self.state == tk.NORMAL else "#71717a"
-        self.create_text(self.w / 2.0, self.h / 2.0, text=self.text, fill=txt_col, font=self.btn_font)
+            img = self._img_disabled
+            t_col = "#71717a"
+        elif self._is_hovered:
+            img = self._img_hover
+            t_col = self.text_color
+        else:
+            img = self._img_norm
+            t_col = self.text_color
+
+        self._bg_img_id = self.create_image(0, 0, anchor="nw", image=img)
+        self._text_id = self.create_text(self.w / 2.0, self.h / 2.0, text=self.text, fill=t_col, font=self.btn_font)
 
 
 class RadialDialWidget(tk.Canvas):
-    """Circular Radial Dial Widget with perimeter tick marks matching 26°C thermostat design."""
+    """Retina-grade supersampled (Lanczos) circular radial tick dial matching 26°C thermostat."""
 
     def __init__(self, parent, size: int = 176, title: str = "GAUGE", value_str: str = "--", unit: str = "", sub_str: str = "READY", percent: float = 0.0, **kwargs):
         super().__init__(parent, width=size, height=size, highlightthickness=0, **kwargs)
@@ -245,20 +275,30 @@ class RadialDialWidget(tk.Canvas):
         self.unit = unit
         self.sub_str = sub_str
         self.percent = percent
-        self.bg_color = "#16161a"
-        self.dial_active = "#ffffff"
-        self.dial_inactive = "#27272e"
+
+        self.bg_color = "#15151a"
+        self.dial_active = (255, 255, 255, 255)
+        self.dial_inactive = (38, 38, 48, 255)
         self.text_color = "#ffffff"
         self.dim_color = "#a1a1aa"
+
+        self._bg_img_id = None
+        self._val_text_id = None
+        self._sub_text_id = None
+        self._title_text_id = None
+        self._current_photo = None
+        self._last_rendered_pct = -1.0
+
         self.draw()
 
-    def set_theme(self, bg: str, active_color: str, inactive_color: str, text_color: str, dim_color: str):
+    def set_theme(self, bg: str, active_color: Tuple[int, int, int, int], inactive_color: Tuple[int, int, int, int], text_color: str, dim_color: str):
         self.bg_color = bg
         self.dial_active = active_color
         self.dial_inactive = inactive_color
         self.text_color = text_color
         self.dim_color = dim_color
         self.configure(bg=bg)
+        self._last_rendered_pct = -1.0
         self.draw()
 
     def update_value(self, value_str: str, percent: float = 0.0, sub_str: str = "", unit: str = None):
@@ -271,123 +311,206 @@ class RadialDialWidget(tk.Canvas):
         self.draw()
 
     def draw(self):
+        # 1. Re-render smooth ticks image with Pillow 2x supersampling if percentage changed
+        scale = 2
+        w_s = self.size * scale
+        h_s = self.size * scale
+
+        # Only recompute dial bitmap if percentage changed or theme invalidated
+        pct_key = round(self.percent, 1)
+        if pct_key != self._last_rendered_pct:
+            self._last_rendered_pct = pct_key
+
+            # Background color tuple
+            bg_rgb = self.winfo_rgb(self.bg_color)
+            bg_tuple = (bg_rgb[0] >> 8, bg_rgb[1] >> 8, bg_rgb[2] >> 8, 255)
+
+            img = Image.new("RGBA", (w_s, h_s), bg_tuple)
+            draw = ImageDraw.Draw(img)
+
+            cx = w_s / 2.0
+            cy = h_s / 2.0
+            radius = (w_s / 2.0) - (24 * scale)
+            inner_radius = radius - (14 * scale)
+
+            start_angle = 135.0
+            sweep_angle = 270.0
+            num_ticks = 42
+
+            active_count = int(round((self.percent / 100.0) * num_ticks))
+
+            for i in range(num_ticks):
+                frac = i / float(num_ticks - 1)
+                deg = start_angle + frac * sweep_angle
+                rad = math.radians(deg)
+
+                x1 = cx + (inner_radius * math.cos(rad))
+                y1 = cy + (inner_radius * math.sin(rad))
+                x2 = cx + (radius * math.cos(rad))
+                y2 = cy + (radius * math.sin(rad))
+
+                col = self.dial_active if (i <= active_count and active_count > 0) else self.dial_inactive
+                line_w = int(round(3.5 * scale)) if (i <= active_count and active_count > 0) else int(round(2.2 * scale))
+                draw.line([(x1, y1), (x2, y2)], fill=col, width=line_w)
+
+            # High-grade Lanczos downscale for silky smooth anti-aliased lines
+            smooth_img = img.resize((self.size, self.size), Image.Resampling.LANCZOS)
+            self._current_photo = ImageTk.PhotoImage(smooth_img)
+
+        # 2. Update Canvas image and text objects
         self.delete("all")
         cx = self.size / 2.0
         cy = self.size / 2.0
-        radius = (self.size / 2.0) - 16
-        inner_radius = radius - 10
 
-        start_angle = 135.0
-        sweep_angle = 270.0
-        num_ticks = 42
-
-        active_count = int(round((self.percent / 100.0) * num_ticks))
-
-        for i in range(num_ticks):
-            fraction = i / float(num_ticks - 1)
-            deg = start_angle + fraction * sweep_angle
-            rad = math.radians(deg)
-
-            x1 = cx + (inner_radius * math.cos(rad))
-            y1 = cy + (inner_radius * math.sin(rad))
-            x2 = cx + (radius * math.cos(rad))
-            y2 = cy + (radius * math.sin(rad))
-
-            color = self.dial_active if (i <= active_count and active_count > 0) else self.dial_inactive
-            width = 3 if (i <= active_count and active_count > 0) else 2
-            self.create_line(x1, y1, x2, y2, fill=color, width=width, capstyle=tk.ROUND)
+        if self._current_photo:
+            self.create_image(0, 0, anchor="nw", image=self._current_photo)
 
         display_val = f"{self.value_str}{self.unit}"
-        val_font_size = 20 if len(display_val) <= 4 else 16
+        val_font_size = 20 if len(display_val) <= 4 else 15
         self.create_text(cx, cy - 8, text=display_val, fill=self.text_color, font=("Segoe UI", val_font_size, "bold"))
         self.create_text(cx, cy + 16, text=self.sub_str.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
-        self.create_text(cx, cy + radius - 4, text=self.title_text.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
+        self.create_text(cx, self.size - 22, text=self.title_text.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
 
 
 class PillToggle(tk.Canvas):
-    """Pill-shaped toggle switch widget matching clean ROOM LAMP / OUTLET switches."""
+    """Ultra-smooth anti-aliased capsule pill toggle with sliding animation."""
 
     def __init__(self, parent, initial: bool = True, on_toggle: Optional[Callable[[bool], None]] = None, **kwargs):
         super().__init__(parent, width=46, height=24, highlightthickness=0, cursor="hand2", **kwargs)
         self.is_on = initial
         self.on_toggle = on_toggle
-        self.bg_parent = "#16161a"
-        self.pill_bg_off = "#23232a"
+        self.bg_parent = "#15151a"
+
+        self.pill_bg_off = "#202026"
+        self.pill_border_off = "#343440"
         self.pill_bg_on = "#ffffff"
-        self.knob_color_off = "#a1a1aa"
-        self.knob_color_on = "#09090b"
+        self.pill_knob_on = "#08080a"
+        self.pill_knob_off = "#8e8e98"
+
+        self._current_knob_x = 25.0 if initial else 3.0
+        self._target_knob_x = 25.0 if initial else 3.0
+        self._animating = False
+
+        self._track_on_img = None
+        self._track_off_img = None
+        self._knob_on_img = None
+        self._knob_off_img = None
+
         self.bind("<Button-1>", self._on_click)
+        self._bake_textures()
         self.draw()
 
-    def set_theme(self, bg_parent: str, pill_bg_off: str, pill_bg_on: str, knob_color_on: str):
+    def set_theme(self, bg_parent: str, pill_bg_off: str, pill_border_off: str, pill_bg_on: str, knob_on: str, knob_off: str):
         self.bg_parent = bg_parent
         self.pill_bg_off = pill_bg_off
+        self.pill_border_off = pill_border_off
         self.pill_bg_on = pill_bg_on
-        self.knob_color_on = knob_color_on
+        self.pill_knob_on = knob_on
+        self.pill_knob_off = knob_off
         self.configure(bg=bg_parent)
+        self._bake_textures()
         self.draw()
 
-    def set_state(self, is_on: bool):
-        self.is_on = is_on
-        self.draw()
+    def _bake_textures(self):
+        scale = 2
+        w, h = 46, 24
+        ws, hs = w * scale, h * scale
+
+        # Track ON
+        t_on = Image.new("RGBA", (ws, hs), (0, 0, 0, 0))
+        d_on = ImageDraw.Draw(t_on)
+        d_on.rounded_rectangle([1, 1, ws - 2, hs - 2], radius=hs / 2.0, fill=self.pill_bg_on)
+        self._track_on_img = ImageTk.PhotoImage(t_on.resize((w, h), Image.Resampling.LANCZOS))
+
+        # Track OFF
+        t_off = Image.new("RGBA", (ws, hs), (0, 0, 0, 0))
+        d_off = ImageDraw.Draw(t_off)
+        d_off.rounded_rectangle([1, 1, ws - 2, hs - 2], radius=hs / 2.0, fill=self.pill_bg_off, outline=self.pill_border_off, width=scale)
+        self._track_off_img = ImageTk.PhotoImage(t_off.resize((w, h), Image.Resampling.LANCZOS))
+
+        # Knob ON
+        ks = 18 * scale
+        k_on = Image.new("RGBA", (ks, ks), (0, 0, 0, 0))
+        dk_on = ImageDraw.Draw(k_on)
+        dk_on.ellipse([1, 1, ks - 2, ks - 2], fill=self.pill_knob_on)
+        self._knob_on_img = ImageTk.PhotoImage(k_on.resize((18, 18), Image.Resampling.LANCZOS))
+
+        # Knob OFF
+        k_off = Image.new("RGBA", (ks, ks), (0, 0, 0, 0))
+        dk_off = ImageDraw.Draw(k_off)
+        dk_off.ellipse([1, 1, ks - 2, ks - 2], fill=self.pill_knob_off)
+        self._knob_off_img = ImageTk.PhotoImage(k_off.resize((18, 18), Image.Resampling.LANCZOS))
 
     def _on_click(self, event):
         self.is_on = not self.is_on
-        self.draw()
+        self._target_knob_x = 25.0 if self.is_on else 3.0
+        self._start_animation()
         if self.on_toggle:
             self.on_toggle(self.is_on)
 
+    def _start_animation(self):
+        if not self._animating:
+            self._animating = True
+            self._animate_step()
+
+    def _animate_step(self):
+        dx = self._target_knob_x - self._current_knob_x
+        if abs(dx) <= 2.0:
+            self._current_knob_x = self._target_knob_x
+            self._animating = False
+            self.draw()
+        else:
+            self._current_knob_x += dx * 0.45
+            self.draw()
+            self.after(16, self._animate_step)
+
     def draw(self):
         self.delete("all")
-        fill_color = self.pill_bg_on if self.is_on else self.pill_bg_off
-        self.create_oval(2, 2, 22, 22, fill=fill_color, outline="")
-        self.create_oval(24, 2, 44, 22, fill=fill_color, outline="")
-        self.create_rectangle(12, 2, 34, 22, fill=fill_color, outline="")
+        track_img = self._track_on_img if self.is_on else self._track_off_img
+        knob_img = self._knob_on_img if self.is_on else self._knob_off_img
 
-        knob_color = self.knob_color_on if self.is_on else self.knob_color_off
-        if self.is_on:
-            self.create_oval(26, 4, 42, 20, fill=knob_color, outline="")
-        else:
-            self.create_oval(4, 4, 20, 20, fill=knob_color, outline="")
+        if track_img:
+            self.create_image(0, 0, anchor="nw", image=track_img)
+        if knob_img:
+            self.create_image(int(round(self._current_knob_x)), 3, anchor="nw", image=knob_img)
 
 
 class TelemetryWaveCanvas(tk.Canvas):
-    """Oscillating telemetry wave curve matching the upper right card in the 100Days design."""
+    """Silky-smooth, tear-free 30fps in-place coords animated telemetry wave."""
 
-    def __init__(self, parent, width=300, height=54, **kwargs):
+    def __init__(self, parent, width=300, height=52, **kwargs):
         super().__init__(parent, width=width, height=height, highlightthickness=0, **kwargs)
         self.w = width
         self.h = height
         self.phase = 0.0
         self.wave_color = "#ffffff"
-        self.bg_color = "#16161a"
-        self.draw()
+        self.bg_color = "#15151a"
+        self.line_id = self.create_line([0, height / 2.0, width, height / 2.0], fill=self.wave_color, width=2, smooth=True)
         self._animate()
 
     def set_theme(self, bg: str, wave_color: str):
         self.bg_color = bg
         self.wave_color = wave_color
         self.configure(bg=bg)
-        self.draw()
+        self.itemconfig(self.line_id, fill=wave_color)
 
     def _animate(self):
         if not self.winfo_exists():
             return
-        self.phase += 0.07
-        self.draw()
-        self.after(60, self._animate)
-
-    def draw(self):
-        self.delete("all")
-        pts = []
+        self.phase += 0.065
         mid_y = self.h / 2.0
         amp1 = 12.0
-        amp2 = 6.0
-        for x in range(8, self.w - 8, 4):
-            y = mid_y + amp1 * math.sin((x * 0.038) + self.phase) + amp2 * math.cos((x * 0.082) - self.phase * 0.5)
+        amp2 = 5.5
+
+        pts = []
+        for x in range(6, self.w - 6, 4):
+            y = mid_y + amp1 * math.sin((x * 0.036) + self.phase) + amp2 * math.cos((x * 0.082) - self.phase * 0.4)
             pts.extend([x, y])
+
         if len(pts) >= 4:
-            self.create_line(pts, fill=self.wave_color, width=2, smooth=True)
+            self.coords(self.line_id, *pts)
+
+        self.after(33, self._animate)  # Smooth 30 FPS tear-free
 
 
 class HardwareGauntletGUI:
@@ -1224,7 +1347,6 @@ class HardwareGauntletGUI:
 
             for btn in themed_widgets["pill_buttons"]:
                 try:
-                    # Resolve parent background
                     parent_bg = th["surface"] if btn.master == btn_frame else th["card"]
                     btn.set_theme(
                         bg_parent=parent_bg,
@@ -1273,9 +1395,11 @@ class HardwareGauntletGUI:
                     parent_bg = th[container_key] if container_key in th else th["card"]
                     toggle.set_theme(
                         bg_parent=parent_bg,
-                        pill_bg_off=th["pill_bg"],
-                        pill_bg_on=th["pill_active"],
-                        knob_color_on=th["pill_knob"]
+                        pill_bg_off=th["pill_bg_off"],
+                        pill_border_off=th["pill_border_off"],
+                        pill_bg_on=th["pill_bg_on"],
+                        knob_on=th["pill_knob_on"],
+                        knob_off=th["pill_knob_off"]
                     )
                 except Exception:
                     pass

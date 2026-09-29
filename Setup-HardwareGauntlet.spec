@@ -5,7 +5,7 @@ a = Analysis(
     ['installer/setup_wizard.py'],
     pathex=[],
     datas=[('assets', 'assets')],
-    hiddenimports=[],
+    hiddenimports=['PIL'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

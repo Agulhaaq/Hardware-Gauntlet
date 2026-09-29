@@ -7,10 +7,23 @@ import subprocess
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+from typing import Optional
+from PIL import Image, ImageDraw, ImageTk
+
+
+def create_smooth_pill_img(w: int, h: int, fill_color: str, border_color: Optional[str] = None, scale: int = 2) -> Image.Image:
+    """Render a pixel-perfect, anti-aliased pill capsule with Lanczos downsampling."""
+    ws = w * scale
+    hs = h * scale
+    rad = hs / 2.0
+    im = Image.new("RGBA", (ws, hs), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([1, 1, ws - 2, hs - 2], radius=rad, fill=fill_color, outline=border_color, width=scale if border_color else 0)
+    return im.resize((w, h), Image.Resampling.LANCZOS)
 
 
 class PillButton(tk.Canvas):
-    """Pill-shaped capsule button matching 100Days design aesthetic."""
+    """Pill-shaped capsule button with retina anti-aliasing matching 100Days design aesthetic."""
 
     def __init__(self, parent, text="BUTTON", command=None, width=120, height=32, is_primary=True, font=("Segoe UI", 8, "bold"), **kwargs):
         super().__init__(parent, width=width, height=height, highlightthickness=0, cursor="hand2", **kwargs)
@@ -26,13 +39,34 @@ class PillButton(tk.Canvas):
         self.hover_color = "#e4e4e7" if is_primary else "#27272a"
         self.border_color = "#ffffff" if is_primary else "#3f3f46"
         self._is_hovered = False
+
+        self._img_norm: Optional[ImageTk.PhotoImage] = None
+        self._img_hover: Optional[ImageTk.PhotoImage] = None
+        self._img_disabled: Optional[ImageTk.PhotoImage] = None
+
         self.bind("<Enter>", self._on_enter)
         self.bind("<Leave>", self._on_leave)
         self.bind("<Button-1>", self._on_click)
+        self._bake_images()
         self.draw()
+
+    def _bake_images(self):
+        norm_raw = create_smooth_pill_img(self.w, self.h, self.fill_color, self.border_color if not self.is_primary else None)
+        self._img_norm = ImageTk.PhotoImage(norm_raw)
+
+        hover_raw = create_smooth_pill_img(self.w, self.h, self.hover_color, self.border_color if not self.is_primary else None)
+        self._img_hover = ImageTk.PhotoImage(hover_raw)
+
+        dis_raw = create_smooth_pill_img(self.w, self.h, "#27272a", None)
+        self._img_disabled = ImageTk.PhotoImage(dis_raw)
 
     def set_text(self, new_text: str):
         self.text = new_text
+        self.draw()
+
+    def set_state(self, state: str):
+        self.state = state
+        self.configure(cursor="hand2" if state == tk.NORMAL else "arrow")
         self.draw()
 
     def _on_enter(self, e):
@@ -50,27 +84,19 @@ class PillButton(tk.Canvas):
 
     def draw(self):
         self.delete("all")
-        rad = (self.h / 2.0) - 2
-        pts = [
-            rad + 2, 2,
-            self.w - rad - 2, 2,
-            self.w - 2, 2,
-            self.w - 2, 2 + rad,
-            self.w - 2, self.h - rad - 2,
-            self.w - 2, self.h - 2,
-            self.w - rad - 2, self.h - 2,
-            rad + 2, self.h - 2,
-            2, self.h - 2,
-            2, self.h - rad - 2,
-            2, 2 + rad,
-            2, 2
-        ]
-        col = self.hover_color if self._is_hovered else self.fill_color
         if self.state == tk.DISABLED:
-            col = "#27272a"
-        self.create_polygon(pts, smooth=True, fill=col, outline=self.border_color if not self.is_primary else "", width=1)
-        txt_col = self.text_color if self.state == tk.NORMAL else "#71717a"
-        self.create_text(self.w / 2.0, self.h / 2.0, text=self.text, fill=txt_col, font=self.btn_font)
+            img = self._img_disabled
+            t_col = "#71717a"
+        elif self._is_hovered:
+            img = self._img_hover
+            t_col = self.text_color
+        else:
+            img = self._img_norm
+            t_col = self.text_color
+
+        if img:
+            self.create_image(self.w / 2.0, self.h / 2.0, image=img)
+        self.create_text(self.w / 2.0, self.h / 2.0, text=self.text, fill=t_col, font=self.btn_font)
 
 
 class SetupWizard:
