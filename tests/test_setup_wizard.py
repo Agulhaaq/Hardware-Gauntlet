@@ -52,11 +52,10 @@ def test_setup_wizard_navigation(tk_session_root):
         # Should initialize on welcome page
         assert len(wizard.container.winfo_children()) > 0
 
-        # Navigate to options page
-        wizard.show_options_page()
-        assert len(wizard.container.winfo_children()) > 0
+        # Verify clear_page and show_welcome_page
+        wizard.clear_page()
+        assert len(wizard.container.winfo_children()) == 0
 
-        # Navigate back to welcome page
         wizard.show_welcome_page()
         assert len(wizard.container.winfo_children()) > 0
     finally:

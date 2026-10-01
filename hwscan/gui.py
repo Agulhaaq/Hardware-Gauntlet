@@ -28,10 +28,6 @@ from hwscan.core.utils import format_bytes, format_hz
 from hwscan.core.stress_test import StressTestEngine
 from hwscan.core.installer_integration import (
     acquire_single_instance_lock,
-    install_application,
-    uninstall_application,
-    is_installed,
-    get_install_directory,
     WINDOW_TITLE
 )
 
@@ -807,22 +803,6 @@ class HardwareGauntletGUI:
                 self.json_reporter.write_file(self.current_report, f)
                 messagebox.showinfo("JSON Saved", f"Machine-readable JSON report saved to:\n{f}")
 
-        def do_install():
-            btn_install.set_state(tk.DISABLED)
-            btn_install.set_text("⏳ INSTALLING...")
-            def worker():
-                success, msg = install_application()
-                def on_done():
-                    btn_install.set_state(tk.NORMAL)
-                    btn_install.set_text("✓ INSTALLED" if success else "📦 INSTALL TO PC")
-                    if success:
-                        lbl_install_status.config(text=f"Status: Installed at {get_install_directory()}")
-                        messagebox.showinfo("Installation Complete", f"{msg}\n\n• Start Menu shortcut created\n• Desktop shortcut created\n• CLI command 'hwscan' added to PATH\n• Visible in Windows Settings > Installed Apps")
-                    else:
-                        messagebox.showerror("Installation Error", msg)
-                root.after(0, on_done)
-            threading.Thread(target=worker, daemon=True).start()
-
         def toggle_theme():
             self.current_theme = "light" if self.current_theme == "dark" else "dark"
             apply_current_theme()
@@ -837,10 +817,6 @@ class HardwareGauntletGUI:
         btn_scan = PillButton(btn_frame, text="▶ RUN SCAN", command=do_scan, width=116, height=32, is_primary=True)
         btn_scan.pack(side=tk.LEFT, padx=3)
         themed_widgets["pill_buttons"].append(btn_scan)
-
-        btn_install = PillButton(btn_frame, text="✓ INSTALLED" if is_installed() else "📦 INSTALL", command=do_install, width=108, height=32, is_primary=False)
-        btn_install.pack(side=tk.LEFT, padx=3)
-        themed_widgets["pill_buttons"].append(btn_install)
 
         btn_theme = PillButton(btn_frame, text="☀️ LIGHT", command=toggle_theme, width=96, height=32, is_primary=False)
         btn_theme.pack(side=tk.LEFT, padx=3)
@@ -1400,14 +1376,14 @@ class HardwareGauntletGUI:
         themed_widgets["surface"].append(install_card)
         themed_widgets["borders"].append(install_card)
 
-        lbl_inst_title = tk.Label(install_card, text="CARD 06 — SYSTEM INSTALLATION & SHORTCUT MANAGEMENT", font=("Segoe UI", 11, "bold"))
+        lbl_inst_title = tk.Label(install_card, text="CARD 06 — SINGLE-INSTANCE APPLICATION ARCHITECTURE", font=("Segoe UI", 11, "bold"))
         lbl_inst_title.pack(anchor="w")
         themed_widgets["surface"].append(lbl_inst_title)
         themed_widgets["text_primary"].append(lbl_inst_title)
 
         lbl_install_status = tk.Label(
             install_card,
-            text=f"Status: {'Installed at ' + get_install_directory() if is_installed() else 'Running in standalone portable mode'}",
+            text="Status: Active (Strict Single-Instance Enforcement & In-Memory Execution)",
             font=("Segoe UI", 9)
         )
         lbl_install_status.pack(anchor="w", pady=(4, 12))
@@ -1418,38 +1394,20 @@ class HardwareGauntletGUI:
         inst_btn_row.pack(anchor="w", pady=(0, 14))
         themed_widgets["surface"].append(inst_btn_row)
 
-        btn_install_tab = PillButton(inst_btn_row, text="📦 INSTALL TO PC", command=do_install, width=150, height=34, is_primary=True)
-        btn_install_tab.pack(side=tk.LEFT, padx=(0, 10))
-        themed_widgets["pill_buttons"].append(btn_install_tab)
-
         def do_open_folder():
-            p = get_install_directory() if is_installed() else os.getcwd()
+            p = os.getcwd()
             os.startfile(p) if sys.platform == "win32" else subprocess.Popen(["xdg-open", p])
 
-        btn_folder = PillButton(inst_btn_row, text="📂 OPEN FOLDER", command=do_open_folder, width=130, height=34, is_primary=False)
-        btn_folder.pack(side=tk.LEFT, padx=(0, 10))
+        btn_folder = PillButton(inst_btn_row, text="📂 OPEN APPLICATION FOLDER", command=do_open_folder, width=200, height=34, is_primary=True)
+        btn_folder.pack(side=tk.LEFT)
         themed_widgets["pill_buttons"].append(btn_folder)
 
-        def do_uninstall():
-            if messagebox.askyesno("Uninstall", "Are you sure you want to uninstall Hardware Gauntlet from your PC?"):
-                success, msg = uninstall_application()
-                if success:
-                    lbl_install_status.config(text="Status: Uninstalled from PC (Running portable)")
-                    btn_install.set_text("📦 INSTALL")
-                    messagebox.showinfo("Uninstalled", "Hardware Gauntlet shortcuts and registry entries have been removed.")
-                else:
-                    messagebox.showerror("Error", msg)
-
-        btn_uninst = PillButton(inst_btn_row, text="🗑️ UNINSTALL", command=do_uninstall, width=110, height=34, is_primary=False)
-        btn_uninst.pack(side=tk.LEFT)
-        themed_widgets["pill_buttons"].append(btn_uninst)
-
         info_text = (
+            "• Single-Instance Guard: Strictly 1 instance permitted at a time (restores & focuses existing window)\n"
             "• Running Mode: Native Offline Client Application (Zero Network / No Localhost Required)\n"
-            "• Single Instance Lock: Only 1 application window open at a time (focuses existing instance)\n"
             "• Scanning Architecture: In-Memory Multi-Threaded Telemetry Collector\n"
             "• Torture & Benchmarks: CPU torture, RAM pattern integrity check, disk throughput, thermal monitor\n"
-            "• System Registration: Desktop Shortcut, Start Menu, User PATH, and Windows Settings Uninstaller"
+            "• Storage Footprint: Standalone execution with zero registry pollution and zero installation files"
         )
         lbl_info_body = tk.Label(install_card, text=info_text, font=("Segoe UI", 9), justify=tk.LEFT)
         lbl_info_body.pack(anchor="w")

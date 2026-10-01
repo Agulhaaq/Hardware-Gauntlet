@@ -7,41 +7,22 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 [![Build & Release](https://github.com/Agulhaaq/Hardware-Gauntlet/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/Agulhaaq/Hardware-Gauntlet/actions)
 
-Hardware Gauntlet is a high-performance system hardware audit and diagnostic suite that runs as a **full permanent installed desktop application** or as an **instant one-off portable instance** across Windows, macOS, and Linux without external web servers or localhost dependencies.
+Hardware Gauntlet is a high-performance system hardware audit and diagnostic suite that runs as an **instant, dedicated single-instance desktop application** across Windows, macOS, and Linux without external web servers or localhost dependencies.
 
 ---
 
-## ⚡ Two Ways to Run: "Just Run" or "Install as Application"
+## ⚡ Dedicated Single-Instance Execution
 
-Hardware Gauntlet provides total flexibility: you can **run it as a portable one-off instance without installing anything**, or **install it permanently to your operating system**.
+Hardware Gauntlet is engineered strictly for **single-instance standalone execution**:
+- **Strict Single-Instance Guard**: Only **1 instance** of Hardware Gauntlet is allowed to run at a time. If an attempt is made to launch another instance, the active window is automatically restored from minimized state and brought directly to the foreground.
+- **Zero Installation Required**: Pure in-memory standalone operation. Leaves zero temporary files, requires no registry entries, and modifies no operating system directories.
+- **100% Offline & Private**: Zero background network requests, zero telemetry, and pure local diagnostic performance.
 
 | Mode | Windows | Linux / macOS | What Happens |
 | :--- | :--- | :--- | :--- |
-| **🚀 Option 1: Just Run (One-Off Instance)** | Double-click `Run-Portable.bat`<br>or `HardwareGauntlet.exe` | `./run-portable.sh` | **Zero installation.** Runs instantly in-memory. Leaves no traces, writes no registry keys, and requires no admin rights. |
-| **📦 Option 2: Install as Application** | Double-click `Setup-HardwareGauntlet.exe`<br>or `Install-HardwareGauntlet.bat` | `bash installer/install-linux.sh`<br>`bash installer/install-macos.sh` | **Permanent installation.** Adds to Start Menu, creates Desktop shortcut, registers in Windows Settings > Installed Apps, and adds `hwscan` to User `PATH`. |
-| **🎛️ Interactive Choice Menu** | Double-click `Run-HardwareGauntlet.bat` | `./run-portable.sh` | Terminal launcher giving you a 1-click prompt to select between Portable, Installer, or CLI mode. |
-
----
-
-### 🪟 Windows Details
-
-- **⚡ Just Run (Portable)**:
-  - Simply double-click `Run-Portable.bat` or `HardwareGauntlet.exe`.
-  - The native Tkinter GUI opens immediately and scans hardware in parallel (~2.7s).
-  - Can be carried on a USB drive or run from any folder without setup.
-
-- **📦 Install as Full Application**:
-  - **GUI Setup Wizard**: Run `Setup-HardwareGauntlet.exe` (includes both a "⚡ Just Run Now" button and a guided install flow).
-  - **1-Click Batch Installer**: Double-click `Install-HardwareGauntlet.bat` or run:
-    ```powershell
-    powershell -ExecutionPolicy Bypass -File .\installer\install-windows.ps1
-    ```
-  - *Integration Details:*
-    - Installs to `%LOCALAPPDATA%\Programs\HardwareGauntlet`
-    - Start Menu shortcut (searchable in Windows Search)
-    - Desktop shortcut with high-resolution icon
-    - Registered in **Windows Settings > Apps > Installed apps** (clean 1-click uninstall)
-    - Adds `hwscan` to User `PATH` for instant CLI access anywhere
+| **🚀 Desktop GUI (Single Instance)** | Double-click `HardwareGauntlet.exe`<br>or `Run-Portable.bat` | `./run-portable.sh` | Opens the standalone desktop UI. If already running, focuses the existing instance. |
+| **⚡ Single Instance Launcher** | Double-click `Setup-HardwareGauntlet.exe` | `./run-portable.sh` | Launches or focuses the single application window. |
+| **🎛️ Terminal Launcher** | Double-click `Run-HardwareGauntlet.bat` | `./run-portable.sh` | Interactive prompt to launch the single GUI instance or run terminal CLI diagnostics. |
 
 ---
 

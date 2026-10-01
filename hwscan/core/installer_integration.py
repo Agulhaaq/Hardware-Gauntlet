@@ -33,8 +33,28 @@ def acquire_single_instance_lock(window_title: str = WINDOW_TITLE) -> bool:
             ERROR_ALREADY_EXISTS = 183
 
             if last_error == ERROR_ALREADY_EXISTS:
-                # Find and focus existing window
+                # 1. Direct window title match
                 hwnd = user32.FindWindowW(None, window_title)
+
+                # 2. Substring match fallback via EnumWindows
+                if not hwnd:
+                    found_hwnds = []
+                    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+                    def _enum_proc(h, _):
+                        length = user32.GetWindowTextLengthW(h)
+                        if length > 0:
+                            buff = ctypes.create_unicode_buffer(length + 1)
+                            user32.GetWindowTextW(h, buff, length + 1)
+                            if "Hardware Gauntlet" in buff.value:
+                                found_hwnds.append(h)
+                                return False
+                        return True
+
+                    user32.EnumWindows(WNDENUMPROC(_enum_proc), 0)
+                    if found_hwnds:
+                        hwnd = found_hwnds[0]
+
                 if hwnd:
                     SW_RESTORE = 9
                     user32.ShowWindow(hwnd, SW_RESTORE)
