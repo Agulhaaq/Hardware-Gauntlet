@@ -691,6 +691,7 @@ class HardwareGauntletGUI:
         root.title(WINDOW_TITLE)
         root.geometry("1180x820")
         root.minsize(980, 700)
+        root.update_idletasks()
 
         ico_path = get_asset_file_path("app.ico")
         if sys.platform == "win32" and os.path.exists(ico_path):

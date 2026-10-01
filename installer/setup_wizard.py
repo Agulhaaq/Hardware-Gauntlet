@@ -9,7 +9,7 @@ from tkinter import messagebox
 from typing import Optional
 from PIL import Image, ImageDraw, ImageTk
 
-from hwscan.core.installer_integration import acquire_single_instance_lock, WINDOW_TITLE
+from hwscan.core.installer_integration import find_existing_window, focus_window, WINDOW_TITLE
 
 
 def create_smooth_pill_img(w: int, h: int, fill_color: str, border_color: Optional[str] = None, scale: int = 2) -> Image.Image:
@@ -177,8 +177,9 @@ class SetupWizard:
 
     def launch_portable(self):
         """Ensure single instance: focus existing instance or launch the standalone application."""
-        if not acquire_single_instance_lock(WINDOW_TITLE):
-            # Window already focused by acquire_single_instance_lock
+        hwnd = find_existing_window(WINDOW_TITLE)
+        if hwnd:
+            focus_window(hwnd)
             self.root.destroy()
             return
 
@@ -287,7 +288,9 @@ SingleInstanceLauncher = SetupWizard
 
 def main():
     # If Hardware Gauntlet is already running, focus it and exit immediately
-    if not acquire_single_instance_lock(WINDOW_TITLE):
+    hwnd = find_existing_window(WINDOW_TITLE)
+    if hwnd:
+        focus_window(hwnd)
         print("[*] Hardware Gauntlet is already running. Focus transferred to active window.")
         return
 
