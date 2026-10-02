@@ -37,6 +37,13 @@ from hwscan.core.cleanup import (
     clean_network_cache,
     run_full_system_cleanup
 )
+from hwscan.core.deep_cleanup import (
+    clean_component_store,
+    clean_driver_and_kernel_store,
+    optimize_system_storage_overhead,
+    clean_developer_caches,
+    run_deep_system_optimization
+)
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -1515,11 +1522,22 @@ class HardwareGauntletGUI:
 
             threading.Thread(target=worker, daemon=True).start()
 
+        btn_deep_clean = PillButton(
+            clean_hdr_row,
+            text="🚀 DEEP OS CLEANUP",
+            command=lambda: run_cleanup_worker("Deep Software & OS Component Suite", run_deep_system_optimization),
+            width=175,
+            height=30,
+            is_primary=False
+        )
+        btn_deep_clean.pack(side=tk.RIGHT, padx=(4, 0))
+        themed_widgets["pill_buttons"].append(btn_deep_clean)
+
         btn_full_clean = PillButton(
             clean_hdr_row,
-            text="⚡ FULL SYSTEM OPTIMIZATION",
-            command=lambda: run_cleanup_worker("Full System Optimization Pipeline", run_full_system_cleanup),
-            width=220,
+            text="⚡ STANDARD OPTIMIZE",
+            command=lambda: run_cleanup_worker("Full Standard Optimization Pipeline", run_full_system_cleanup),
+            width=175,
             height=30,
             is_primary=True
         )
@@ -1531,7 +1549,7 @@ class HardwareGauntletGUI:
         themed_widgets["surface"].append(clean_grid)
 
         def add_clean_tile(parent, title, desc, action_text, fn, target_name):
-            tile = tk.Frame(parent, padx=12, pady=10, highlightthickness=1)
+            tile = tk.Frame(parent, padx=12, pady=8, highlightthickness=1)
             tile.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=4)
             themed_widgets["cards"].append(tile)
             themed_widgets["borders"].append(tile)
@@ -1542,7 +1560,7 @@ class HardwareGauntletGUI:
             themed_widgets["text_primary"].append(t)
 
             d = tk.Label(tile, text=desc, font=("Segoe UI", 8))
-            d.pack(anchor="w", pady=(2, 8))
+            d.pack(anchor="w", pady=(2, 6))
             themed_widgets["cards"].append(d)
             themed_widgets["text_dim"].append(d)
 
@@ -1554,6 +1572,20 @@ class HardwareGauntletGUI:
         add_clean_tile(clean_grid, "⚡ RAM Reclamation", "Trim Working Sets & Standby", "RECLAIM RAM", clean_ram, "RAM Working Set Reclamation")
         add_clean_tile(clean_grid, "🧠 CPU & Processes", "Reap Zombies & Tune Queues", "OPTIMIZE CPU", clean_cpu, "CPU & Process Optimization")
         add_clean_tile(clean_grid, "🌐 Network & DNS", "Flush Resolver & Sockets", "FLUSH DNS", clean_network_cache, "Network & DNS Resolver Flush")
+
+        lbl_deep_sub = tk.Label(cleanup_card, text="DEEP OS COMPONENT & DEVELOPER TOOLCHAINS —", font=("Segoe UI", 8, "bold"))
+        lbl_deep_sub.pack(anchor="w", pady=(6, 2))
+        themed_widgets["surface"].append(lbl_deep_sub)
+        themed_widgets["text_dim"].append(lbl_deep_sub)
+
+        deep_clean_grid = tk.Frame(cleanup_card)
+        deep_clean_grid.pack(fill=tk.X, pady=(0, 4))
+        themed_widgets["surface"].append(deep_clean_grid)
+
+        add_clean_tile(deep_clean_grid, "🛠️ Component Store", "WinSxS & Package Cache", "CLEAN STORE", clean_component_store, "Component Store Optimization")
+        add_clean_tile(deep_clean_grid, "🚗 Driver Store", "Audit OEM INF Packages", "AUDIT DRIVERS", clean_driver_and_kernel_store, "Driver & Kernel Store Audit")
+        add_clean_tile(deep_clean_grid, "🔋 System Overhead", "Hiberfil & Log Vacuum", "TRIM OVERHEAD", optimize_system_storage_overhead, "System Overhead Optimization")
+        add_clean_tile(deep_clean_grid, "📦 Developer Caches", "Docker, NPM, Pip, Cargo", "PURGE DEV CACHES", clean_developer_caches, "Developer Cache Purge")
 
         # Installation & System Registration Card
         install_card = tk.Frame(tab_tools, padx=20, pady=16, highlightthickness=1)
