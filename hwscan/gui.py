@@ -57,6 +57,12 @@ from hwscan.core.physical_maintenance import (
     get_peripherals_and_ports_hygiene_guide,
     run_physical_maintenance_suite
 )
+from hwscan.core.startup_service_tuner import (
+    audit_startup_applications,
+    audit_background_services,
+    audit_power_and_latency_profiles,
+    run_startup_optimization_suite
+)
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -1627,6 +1633,20 @@ class HardwareGauntletGUI:
         add_clean_tile(phys_clean_grid, "💨 Fan & Dust De-Clog", "Back-EMF Bearing Safety", "DUST PROTOCOL", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Fan & Dust Safety Protocol")
         add_clean_tile(phys_clean_grid, "🧪 Thermal Repasting", "PTM7950 & TIM Advisor", "REPASTE GUIDE", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Thermal Repasting Advisor")
         add_clean_tile(phys_clean_grid, "🖥️ Screen & Port Care", "USB-C Lint & AR Coatings", "PORT/SCREEN CARE", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Peripherals & Port Hygiene")
+
+        lbl_tune_sub = tk.Label(cleanup_card, text="STARTUP HYGIENE, BACKGROUND SERVICES & LATENCY TUNER —", font=("Segoe UI", 8, "bold"))
+        lbl_tune_sub.pack(anchor="w", pady=(6, 2))
+        themed_widgets["surface"].append(lbl_tune_sub)
+        themed_widgets["text_dim"].append(lbl_tune_sub)
+
+        tune_clean_grid = tk.Frame(cleanup_card)
+        tune_clean_grid.pack(fill=tk.X, pady=(0, 4))
+        themed_widgets["surface"].append(tune_clean_grid)
+
+        add_clean_tile(tune_clean_grid, "🚀 Startup Audit", "Impact Scores & Delay", "AUDIT STARTUP", audit_startup_applications, "Startup Application Audit")
+        add_clean_tile(tune_clean_grid, "⚙️ Service Profiler", "Telemetry & Pollers", "PROFILE SERVICES", audit_background_services, "Service Overhead Profiler")
+        add_clean_tile(tune_clean_grid, "⚡ Power & Latency", "Core Parking & Plans", "AUDIT POWER", audit_power_and_latency_profiles, "Power & Latency Profiler")
+        add_clean_tile(tune_clean_grid, "🛡️ Full Startup Suite", "Unified Latency Analysis", "RUN STARTUP SUITE", run_startup_optimization_suite, "Startup & Latency Suite")
 
         # Installation & System Registration Card
         install_card = tk.Frame(tab_tools, padx=20, pady=16, highlightthickness=1)
