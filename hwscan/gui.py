@@ -30,6 +30,13 @@ from hwscan.core.installer_integration import (
     acquire_single_instance_lock,
     WINDOW_TITLE
 )
+from hwscan.core.cleanup import (
+    clean_storage,
+    clean_ram,
+    clean_cpu,
+    clean_network_cache,
+    run_full_system_cleanup
+)
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -1221,7 +1228,7 @@ class HardwareGauntletGUI:
         themed_widgets["surface"].append(win_tools_box)
         themed_widgets["borders"].append(win_tools_box)
 
-        lbl_win_bench = tk.Label(win_tools_box, text="WINDOWS BENCHMARKS —", font=("Segoe UI", 9, "bold"))
+        lbl_win_bench = tk.Label(win_tools_box, text=f"{platform.system().upper()} BENCHMARKS —", font=("Segoe UI", 9, "bold"))
         lbl_win_bench.pack(anchor="w", pady=(0, 8))
         themed_widgets["surface"].append(lbl_win_bench)
         themed_widgets["text_primary"].append(lbl_win_bench)
@@ -1239,11 +1246,16 @@ class HardwareGauntletGUI:
             add_quick_tool("📈 PERF REPORT (perfmon)", "perfmon.exe /report")
             add_quick_tool("⚡ WINSAT BENCHMARK", "winsat.exe formal")
             add_quick_tool("🎮 DIRECTX DIAGNOSTIC", "dxdiag.exe")
+        elif sys.platform == "darwin":
+            add_quick_tool("🧠 MEMORY MONITOR", "open -a 'Activity Monitor'")
+            add_quick_tool("📈 SYSTEM PROFILER", "system_profiler SPHardwareDataType")
+            add_quick_tool("⚡ STORAGE CHECK", "diskutil list")
+            add_quick_tool("🎮 DISPLAY REPORT", "system_profiler SPDisplaysDataType")
         else:
-            lbl_other = tk.Label(win_tools_box, text="Platform benchmark utilities available via OS console.", font=("Segoe UI", 8))
-            lbl_other.pack(anchor="w")
-            themed_widgets["surface"].append(lbl_other)
-            themed_widgets["text_dim"].append(lbl_other)
+            add_quick_tool("🧠 MEMORY CHECK", "free -h")
+            add_quick_tool("📈 SYSTEM TOP", "x-terminal-emulator -e top || gnome-system-monitor")
+            add_quick_tool("⚡ STORAGE IO", "x-terminal-emulator -e iostat -x 1 5 || df -h")
+            add_quick_tool("🎮 PCI BUS REPORT", "x-terminal-emulator -e lspci")
 
         # Stress Execution logic
         def on_stress_telemetry(t: Dict[str, Any]):
@@ -1429,9 +1441,19 @@ class HardwareGauntletGUI:
             add_tool_card(tools_grid, "📈 Task Manager", "Real-time thread utilization", "taskmgr.exe")
             add_tool_card(tools_grid, "💾 Disk Management", "Partition layouts & health", "diskmgmt.msc")
             add_tool_card(tools_grid, "ℹ️ System Info", "MSInfo32 firmware tables", "msinfo32.exe")
+        elif sys.platform == "darwin":
+            add_tool_card(tools_grid, "📈 Activity Monitor", "Real-time thread utilization", "open -a 'Activity Monitor'")
+            add_tool_card(tools_grid, "💾 Disk Utility", "Partition layouts & health", "open -a 'Disk Utility'")
+            add_tool_card(tools_grid, "ℹ️ System Info", "Hardware & firmware specs", "open -a 'System Information'")
+            add_tool_card(tools_grid, "📜 System Console", "Kernel logs & diagnostic reports", "open -a 'Console'")
+        else:
+            add_tool_card(tools_grid, "📈 System Monitor", "Real-time thread utilization", "gnome-system-monitor")
+            add_tool_card(tools_grid, "💾 Disk Utility", "Partition layouts & health", "gnome-disks")
+            add_tool_card(tools_grid, "ℹ️ Hardware Lister", "Kernel hardware topology", "hardinfo")
+            add_tool_card(tools_grid, "🔌 Device Control", "Drivers & PCI/USB buses", "x-terminal-emulator -e lspci")
 
         # -------------------------------------------------------------
-        # CARD 05 — PowerShell System Cleanup & Cache Purge
+        # CARD 05 — All-Round System Optimization (Storage, RAM, CPU & Network)
         # -------------------------------------------------------------
         cleanup_card = tk.Frame(tab_tools, padx=18, pady=14, highlightthickness=1)
         cleanup_card.pack(fill=tk.X, pady=(0, 14))
@@ -1442,12 +1464,16 @@ class HardwareGauntletGUI:
         clean_hdr_row.pack(fill=tk.X, pady=(0, 4))
         themed_widgets["surface"].append(clean_hdr_row)
 
-        lbl_clean_title = tk.Label(clean_hdr_row, text="CARD 05 — POWERSHELL SYSTEM CLEANUP & CACHE PURGE", font=("Segoe UI", 11, "bold"))
+        lbl_clean_title = tk.Label(clean_hdr_row, text="CARD 05 — ALL-ROUND SYSTEM OPTIMIZATION (STORAGE, RAM & CPU)", font=("Segoe UI", 11, "bold"))
         lbl_clean_title.pack(side=tk.LEFT)
         themed_widgets["surface"].append(lbl_clean_title)
         themed_widgets["text_primary"].append(lbl_clean_title)
 
-        lbl_clean_sub = tk.Label(cleanup_card, text="Automated zero-overhead maintenance scripts executed via background PowerShell engine.", font=("Segoe UI", 8))
+        lbl_clean_sub = tk.Label(
+            cleanup_card,
+            text=f"Automated hardware-aligned maintenance engine for Storage, RAM, CPU & Network (Active Platform: {platform.system()}).",
+            font=("Segoe UI", 8)
+        )
         lbl_clean_sub.pack(anchor="w", pady=(0, 8))
         themed_widgets["surface"].append(lbl_clean_sub)
         themed_widgets["text_dim"].append(lbl_clean_sub)
@@ -1462,7 +1488,7 @@ class HardwareGauntletGUI:
         clean_console_bar.pack(fill=tk.X)
         themed_widgets["surface"].append(clean_console_bar)
 
-        lbl_clean_console = tk.Label(clean_console_bar, text="POWERSHELL EXECUTION STREAM —", font=("Segoe UI", 8, "bold"))
+        lbl_clean_console = tk.Label(clean_console_bar, text="SYSTEM OPTIMIZATION STREAM [CROSS-PLATFORM] —", font=("Segoe UI", 8, "bold"))
         lbl_clean_console.pack(side=tk.LEFT)
         themed_widgets["surface"].append(lbl_clean_console)
         themed_widgets["text_dim"].append(lbl_clean_console)
@@ -1476,32 +1502,24 @@ class HardwareGauntletGUI:
             txt_clean_log.insert(tk.END, f"[{timestamp}] {msg}\n")
             txt_clean_log.see(tk.END)
 
-        log_clean("PowerShell Maintenance Engine standby. Ready for execution.")
+        log_clean(f"All-Round System Optimizer online for {platform.system()} ({platform.machine()}).")
+        log_clean("Select a subsystem optimization module below or trigger full pipeline.")
 
-        def run_powershell_task(title: str, script: str):
+        def run_cleanup_worker(action_name: str, target_fn: Callable):
             def worker():
-                root.after(0, lambda: log_clean(f"Executing: {title}..."))
-                code, out, err = execute_powershell_cleanup(script)
-                if out:
-                    for line in out.strip().splitlines():
-                        if line.strip():
-                            root.after(0, lambda l=line.strip(): log_clean(l))
-                if err:
-                    for line in err.strip().splitlines():
-                        if line.strip():
-                            root.after(0, lambda l=line.strip(): log_clean(f"Notice: {l}"))
-                if code == 0:
-                    root.after(0, lambda: log_clean(f"✓ {title} completed successfully."))
-                else:
-                    root.after(0, lambda: log_clean(f"⚠ {title} exited with status code {code}."))
+                root.after(0, lambda: log_clean(f"Executing: {action_name}..."))
+                try:
+                    target_fn(log_fn=lambda m: root.after(0, lambda msg=m: log_clean(msg)))
+                except Exception as ex:
+                    root.after(0, lambda: log_clean(f"Execution error: {ex}"))
 
             threading.Thread(target=worker, daemon=True).start()
 
         btn_full_clean = PillButton(
             clean_hdr_row,
-            text="⚡ RUN FULL SYSTEM CLEANUP",
-            command=lambda: run_powershell_task("Full System Cleanup Pipeline", POWERSHELL_CLEANUP_COMMANDS["full_cleanup"]),
-            width=210,
+            text="⚡ FULL SYSTEM OPTIMIZATION",
+            command=lambda: run_cleanup_worker("Full System Optimization Pipeline", run_full_system_cleanup),
+            width=220,
             height=30,
             is_primary=True
         )
@@ -1512,7 +1530,7 @@ class HardwareGauntletGUI:
         clean_grid.pack(fill=tk.X, pady=(0, 4))
         themed_widgets["surface"].append(clean_grid)
 
-        def add_clean_tile(parent, title, desc, action_text, ps_cmd):
+        def add_clean_tile(parent, title, desc, action_text, fn, target_name):
             tile = tk.Frame(parent, padx=12, pady=10, highlightthickness=1)
             tile.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=4)
             themed_widgets["cards"].append(tile)
@@ -1528,14 +1546,14 @@ class HardwareGauntletGUI:
             themed_widgets["cards"].append(d)
             themed_widgets["text_dim"].append(d)
 
-            b = PillButton(tile, text=action_text, command=lambda: run_powershell_task(title, ps_cmd), width=150, height=28, is_primary=False)
+            b = PillButton(tile, text=action_text, command=lambda: run_cleanup_worker(target_name, fn), width=150, height=28, is_primary=False)
             b.pack(fill=tk.X)
             themed_widgets["pill_buttons"].append(b)
 
-        add_clean_tile(clean_grid, "🧹 Purge Temp Files", "Clean %TEMP% & Windows Temp", "CLEAN TEMP", POWERSHELL_CLEANUP_COMMANDS["temp"])
-        add_clean_tile(clean_grid, "🗑️ Empty Recycle Bin", "Purge all drive trash items", "EMPTY BIN", POWERSHELL_CLEANUP_COMMANDS["recycle_bin"])
-        add_clean_tile(clean_grid, "🌐 Flush DNS Cache", "Flush resolver & net sockets", "FLUSH DNS", POWERSHELL_CLEANUP_COMMANDS["dns_flush"])
-        add_clean_tile(clean_grid, "📦 Update Cache", "Purge SoftwareDistribution", "PURGE CACHE", POWERSHELL_CLEANUP_COMMANDS["update_cache"])
+        add_clean_tile(clean_grid, "💾 Storage Purge", "Temp, Trash & Caches", "PURGE STORAGE", clean_storage, "Storage Purge")
+        add_clean_tile(clean_grid, "⚡ RAM Reclamation", "Trim Working Sets & Standby", "RECLAIM RAM", clean_ram, "RAM Working Set Reclamation")
+        add_clean_tile(clean_grid, "🧠 CPU & Processes", "Reap Zombies & Tune Queues", "OPTIMIZE CPU", clean_cpu, "CPU & Process Optimization")
+        add_clean_tile(clean_grid, "🌐 Network & DNS", "Flush Resolver & Sockets", "FLUSH DNS", clean_network_cache, "Network & DNS Resolver Flush")
 
         # Installation & System Registration Card
         install_card = tk.Frame(tab_tools, padx=20, pady=16, highlightthickness=1)
@@ -1563,7 +1581,12 @@ class HardwareGauntletGUI:
 
         def do_open_folder():
             p = os.getcwd()
-            os.startfile(p) if sys.platform == "win32" else subprocess.Popen(["xdg-open", p])
+            if sys.platform == "win32":
+                os.startfile(p)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", p])
+            else:
+                subprocess.Popen(["xdg-open", p])
 
         btn_folder = PillButton(inst_btn_row, text="📂 OPEN APPLICATION FOLDER", command=do_open_folder, width=200, height=34, is_primary=True)
         btn_folder.pack(side=tk.LEFT)

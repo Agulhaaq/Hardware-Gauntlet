@@ -36,33 +36,31 @@ class StressTestEngine:
 
     def get_gpu_temperature(self) -> Optional[int]:
         """Query GPU temperature via nvidia-smi if available."""
-        if sys.platform == "win32":
-            try:
-                out = subprocess.check_output(
-                    ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits"],
-                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
-                    text=True,
-                    timeout=1
-                ).strip()
-                return int(out.split("\n")[0].strip())
-            except Exception:
-                pass
-        return None
+        try:
+            cflags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+            out = subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits"],
+                creationflags=cflags,
+                text=True,
+                timeout=1
+            ).strip()
+            return int(out.split("\n")[0].strip())
+        except Exception:
+            return None
 
     def get_gpu_utilization(self) -> Optional[int]:
         """Query GPU utilization via nvidia-smi if available."""
-        if sys.platform == "win32":
-            try:
-                out = subprocess.check_output(
-                    ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
-                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
-                    text=True,
-                    timeout=1
-                ).strip()
-                return int(out.split("\n")[0].strip())
-            except Exception:
-                pass
-        return None
+        try:
+            cflags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+            out = subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+                creationflags=cflags,
+                text=True,
+                timeout=1
+            ).strip()
+            return int(out.split("\n")[0].strip())
+        except Exception:
+            return None
 
     def start_test(
         self,
