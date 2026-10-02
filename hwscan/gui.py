@@ -44,6 +44,12 @@ from hwscan.core.deep_cleanup import (
     clean_developer_caches,
     run_deep_system_optimization
 )
+from hwscan.core.hardware_health import (
+    audit_thermal_health,
+    audit_battery_longevity,
+    optimize_ssd_trim,
+    run_hardware_health_suite
+)
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -1586,6 +1592,20 @@ class HardwareGauntletGUI:
         add_clean_tile(deep_clean_grid, "🚗 Driver Store", "Audit OEM INF Packages", "AUDIT DRIVERS", clean_driver_and_kernel_store, "Driver & Kernel Store Audit")
         add_clean_tile(deep_clean_grid, "🔋 System Overhead", "Hiberfil & Log Vacuum", "TRIM OVERHEAD", optimize_system_storage_overhead, "System Overhead Optimization")
         add_clean_tile(deep_clean_grid, "📦 Developer Caches", "Docker, NPM, Pip, Cargo", "PURGE DEV CACHES", clean_developer_caches, "Developer Cache Purge")
+
+        lbl_hw_sub = tk.Label(cleanup_card, text="HARDWARE HEALTH, THERMAL HEADROOM & SSD HYGIENE —", font=("Segoe UI", 8, "bold"))
+        lbl_hw_sub.pack(anchor="w", pady=(6, 2))
+        themed_widgets["surface"].append(lbl_hw_sub)
+        themed_widgets["text_dim"].append(lbl_hw_sub)
+
+        hw_clean_grid = tk.Frame(cleanup_card)
+        hw_clean_grid.pack(fill=tk.X, pady=(0, 4))
+        themed_widgets["surface"].append(hw_clean_grid)
+
+        add_clean_tile(hw_clean_grid, "🌡️ Thermals & Paste", "Audit TjMax & Dust Delta", "AUDIT THERMALS", audit_thermal_health, "Thermal & Heatsink Audit")
+        add_clean_tile(hw_clean_grid, "🔋 Battery Longevity", "Wear Level & 80% Threshold", "AUDIT BATTERY", audit_battery_longevity, "Battery Longevity Audit")
+        add_clean_tile(hw_clean_grid, "💽 SSD ReTRIM & Health", "Hardware TRIM & SLC Margins", "OPTIMIZE SSD", optimize_ssd_trim, "SSD TRIM Optimization")
+        add_clean_tile(hw_clean_grid, "🛡️ Full Hardware Audit", "Thermals, Battery & Storage", "RUN HW AUDIT", run_hardware_health_suite, "Full Hardware Health Suite")
 
         # Installation & System Registration Card
         install_card = tk.Frame(tab_tools, padx=20, pady=16, highlightthickness=1)
