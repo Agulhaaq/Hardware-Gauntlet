@@ -50,6 +50,13 @@ from hwscan.core.hardware_health import (
     optimize_ssd_trim,
     run_hardware_health_suite
 )
+from hwscan.core.physical_maintenance import (
+    generate_physical_maintenance_guide,
+    get_fan_and_heatsink_cleaning_protocol,
+    get_thermal_repasting_advisor,
+    get_peripherals_and_ports_hygiene_guide,
+    run_physical_maintenance_suite
+)
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -1606,6 +1613,20 @@ class HardwareGauntletGUI:
         add_clean_tile(hw_clean_grid, "🔋 Battery Longevity", "Wear Level & 80% Threshold", "AUDIT BATTERY", audit_battery_longevity, "Battery Longevity Audit")
         add_clean_tile(hw_clean_grid, "💽 SSD ReTRIM & Health", "Hardware TRIM & SLC Margins", "OPTIMIZE SSD", optimize_ssd_trim, "SSD TRIM Optimization")
         add_clean_tile(hw_clean_grid, "🛡️ Full Hardware Audit", "Thermals, Battery & Storage", "RUN HW AUDIT", run_hardware_health_suite, "Full Hardware Health Suite")
+
+        lbl_phys_sub = tk.Label(cleanup_card, text="PHYSICAL MAINTENANCE & HARDWARE LIFESPAN PROTOCOLS —", font=("Segoe UI", 8, "bold"))
+        lbl_phys_sub.pack(anchor="w", pady=(6, 2))
+        themed_widgets["surface"].append(lbl_phys_sub)
+        themed_widgets["text_dim"].append(lbl_phys_sub)
+
+        phys_clean_grid = tk.Frame(cleanup_card)
+        phys_clean_grid.pack(fill=tk.X, pady=(0, 4))
+        themed_widgets["surface"].append(phys_clean_grid)
+
+        add_clean_tile(phys_clean_grid, "📋 System Plan", "Chassis-Tailored Checklist", "GENERATE PLAN", generate_physical_maintenance_guide, "Physical Maintenance Plan")
+        add_clean_tile(phys_clean_grid, "💨 Fan & Dust De-Clog", "Back-EMF Bearing Safety", "DUST PROTOCOL", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Fan & Dust Safety Protocol")
+        add_clean_tile(phys_clean_grid, "🧪 Thermal Repasting", "PTM7950 & TIM Advisor", "REPASTE GUIDE", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Thermal Repasting Advisor")
+        add_clean_tile(phys_clean_grid, "🖥️ Screen & Port Care", "USB-C Lint & AR Coatings", "PORT/SCREEN CARE", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Peripherals & Port Hygiene")
 
         # Installation & System Registration Card
         install_card = tk.Frame(tab_tools, padx=20, pady=16, highlightthickness=1)
