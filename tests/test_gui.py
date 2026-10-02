@@ -11,7 +11,9 @@ from hwscan.gui import (
     PillToggle,
     TelemetryWaveCanvas,
     BubbleCapsuleStrip,
-    HardwareGauntletGUI
+    HardwareGauntletGUI,
+    POWERSHELL_CLEANUP_COMMANDS,
+    execute_powershell_cleanup
 )
 
 
@@ -152,3 +154,20 @@ def test_hardware_gauntlet_gui_instance():
     assert app.current_theme == "dark"
     assert app.engine is not None
     assert app.stress_engine is not None
+
+
+def test_powershell_cleanup_commands():
+    required_keys = ["temp", "recycle_bin", "dns_flush", "update_cache", "full_cleanup"]
+    for k in required_keys:
+        assert k in POWERSHELL_CLEANUP_COMMANDS
+        cmd = POWERSHELL_CLEANUP_COMMANDS[k]
+        assert isinstance(cmd, str)
+        assert len(cmd) > 10
+        assert "ErrorAction SilentlyContinue" in cmd
+
+
+def test_execute_powershell_cleanup():
+    code, out, err = execute_powershell_cleanup("Write-Output 'cleanup-test-ok'")
+    assert code == 0
+    assert "cleanup-test-ok" in out
+

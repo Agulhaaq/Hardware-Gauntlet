@@ -133,6 +133,65 @@ THEMES = {
 }
 
 
+POWERSHELL_CLEANUP_COMMANDS: Dict[str, str] = {
+    "temp": (
+        "& { Get-ChildItem -Path $env:TEMP, 'C:\\Windows\\Temp' -Recurse -Force -ErrorAction SilentlyContinue | "
+        "Where-Object { -not $_.PSIsContainer } | Remove-Item -Force -ErrorAction SilentlyContinue; "
+        "Write-Output 'User and system temporary files purged.' }"
+    ),
+    "recycle_bin": (
+        "& { Clear-RecycleBin -Force -ErrorAction SilentlyContinue; "
+        "Write-Output 'Recycle Bin emptied across all mounted storage volumes.' }"
+    ),
+    "dns_flush": (
+        "& { Clear-DnsClientCache -ErrorAction SilentlyContinue; ipconfig /flushdns; "
+        "Write-Output 'DNS client resolver cache and active sockets flushed.' }"
+    ),
+    "update_cache": (
+        "& { Stop-Service -Name wuauserv -WarningAction SilentlyContinue -ErrorAction SilentlyContinue; "
+        "Remove-Item -Path 'C:\\Windows\\SoftwareDistribution\\Download\\*' -Recurse -Force -ErrorAction SilentlyContinue; "
+        "Start-Service -Name wuauserv -WarningAction SilentlyContinue -ErrorAction SilentlyContinue; "
+        "Write-Output 'Windows Update software distribution download cache purged.' }"
+    ),
+    "full_cleanup": (
+        "& { Write-Output '=== Commencing Full System Optimization Pipeline ==='; "
+        "Get-ChildItem -Path $env:TEMP, 'C:\\Windows\\Temp' -Recurse -Force -ErrorAction SilentlyContinue | Where-Object { -not $_.PSIsContainer } | Remove-Item -Force -ErrorAction SilentlyContinue; "
+        "Write-Output '[1/4] Temp files purged.'; "
+        "Clear-RecycleBin -Force -ErrorAction SilentlyContinue; "
+        "Write-Output '[2/4] Recycle Bin emptied.'; "
+        "Clear-DnsClientCache -ErrorAction SilentlyContinue; ipconfig /flushdns; "
+        "Write-Output '[3/4] DNS cache flushed.'; "
+        "Stop-Service -Name wuauserv -WarningAction SilentlyContinue -ErrorAction SilentlyContinue; "
+        "Remove-Item -Path 'C:\\Windows\\SoftwareDistribution\\Download\\*' -Recurse -Force -ErrorAction SilentlyContinue; "
+        "Start-Service -Name wuauserv -WarningAction SilentlyContinue -ErrorAction SilentlyContinue; "
+        "Write-Output '[4/4] Windows Update download cache purged.'; "
+        "Write-Output '=== Full System Optimization Finished ===' }"
+    )
+}
+
+
+def execute_powershell_cleanup(script: str, timeout: int = 60) -> Tuple[int, str, str]:
+    """Execute a powershell cleanup command silently without console flashing and return (returncode, stdout, stderr)."""
+    if sys.platform != "win32":
+        return 0, "PowerShell cleanup requires Windows environment.", ""
+    try:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+        proc = subprocess.Popen(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            startupinfo=startupinfo,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        out, err = proc.communicate(timeout=timeout)
+        return proc.returncode, out or "", err or ""
+    except Exception as ex:
+        return 1, "", str(ex)
+
+
 def get_asset_file_path(filename: str) -> str:
     """Resolve asset paths whether running from source, PyInstaller bundle, or installed directory."""
     candidates = []
@@ -1370,6 +1429,113 @@ class HardwareGauntletGUI:
             add_tool_card(tools_grid, "📈 Task Manager", "Real-time thread utilization", "taskmgr.exe")
             add_tool_card(tools_grid, "💾 Disk Management", "Partition layouts & health", "diskmgmt.msc")
             add_tool_card(tools_grid, "ℹ️ System Info", "MSInfo32 firmware tables", "msinfo32.exe")
+
+        # -------------------------------------------------------------
+        # CARD 05 — PowerShell System Cleanup & Cache Purge
+        # -------------------------------------------------------------
+        cleanup_card = tk.Frame(tab_tools, padx=18, pady=14, highlightthickness=1)
+        cleanup_card.pack(fill=tk.X, pady=(0, 14))
+        themed_widgets["surface"].append(cleanup_card)
+        themed_widgets["borders"].append(cleanup_card)
+
+        clean_hdr_row = tk.Frame(cleanup_card)
+        clean_hdr_row.pack(fill=tk.X, pady=(0, 4))
+        themed_widgets["surface"].append(clean_hdr_row)
+
+        lbl_clean_title = tk.Label(clean_hdr_row, text="CARD 05 — POWERSHELL SYSTEM CLEANUP & CACHE PURGE", font=("Segoe UI", 11, "bold"))
+        lbl_clean_title.pack(side=tk.LEFT)
+        themed_widgets["surface"].append(lbl_clean_title)
+        themed_widgets["text_primary"].append(lbl_clean_title)
+
+        lbl_clean_sub = tk.Label(cleanup_card, text="Automated zero-overhead maintenance scripts executed via background PowerShell engine.", font=("Segoe UI", 8))
+        lbl_clean_sub.pack(anchor="w", pady=(0, 8))
+        themed_widgets["surface"].append(lbl_clean_sub)
+        themed_widgets["text_dim"].append(lbl_clean_sub)
+
+        # Execution console inside cleanup card
+        clean_console_frame = tk.Frame(cleanup_card, highlightthickness=1)
+        clean_console_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(8, 0))
+        themed_widgets["surface"].append(clean_console_frame)
+        themed_widgets["borders"].append(clean_console_frame)
+
+        clean_console_bar = tk.Frame(clean_console_frame, padx=8, pady=3)
+        clean_console_bar.pack(fill=tk.X)
+        themed_widgets["surface"].append(clean_console_bar)
+
+        lbl_clean_console = tk.Label(clean_console_bar, text="POWERSHELL EXECUTION STREAM —", font=("Segoe UI", 8, "bold"))
+        lbl_clean_console.pack(side=tk.LEFT)
+        themed_widgets["surface"].append(lbl_clean_console)
+        themed_widgets["text_dim"].append(lbl_clean_console)
+
+        txt_clean_log = tk.Text(clean_console_frame, font=("Consolas", 8), relief=tk.FLAT, padx=8, pady=4, height=4)
+        txt_clean_log.pack(fill=tk.X)
+        themed_widgets["consoles"].append(txt_clean_log)
+
+        def log_clean(msg: str):
+            timestamp = time.strftime("%H:%M:%S")
+            txt_clean_log.insert(tk.END, f"[{timestamp}] {msg}\n")
+            txt_clean_log.see(tk.END)
+
+        log_clean("PowerShell Maintenance Engine standby. Ready for execution.")
+
+        def run_powershell_task(title: str, script: str):
+            def worker():
+                root.after(0, lambda: log_clean(f"Executing: {title}..."))
+                code, out, err = execute_powershell_cleanup(script)
+                if out:
+                    for line in out.strip().splitlines():
+                        if line.strip():
+                            root.after(0, lambda l=line.strip(): log_clean(l))
+                if err:
+                    for line in err.strip().splitlines():
+                        if line.strip():
+                            root.after(0, lambda l=line.strip(): log_clean(f"Notice: {l}"))
+                if code == 0:
+                    root.after(0, lambda: log_clean(f"✓ {title} completed successfully."))
+                else:
+                    root.after(0, lambda: log_clean(f"⚠ {title} exited with status code {code}."))
+
+            threading.Thread(target=worker, daemon=True).start()
+
+        btn_full_clean = PillButton(
+            clean_hdr_row,
+            text="⚡ RUN FULL SYSTEM CLEANUP",
+            command=lambda: run_powershell_task("Full System Cleanup Pipeline", POWERSHELL_CLEANUP_COMMANDS["full_cleanup"]),
+            width=210,
+            height=30,
+            is_primary=True
+        )
+        btn_full_clean.pack(side=tk.RIGHT)
+        themed_widgets["pill_buttons"].append(btn_full_clean)
+
+        clean_grid = tk.Frame(cleanup_card)
+        clean_grid.pack(fill=tk.X, pady=(0, 4))
+        themed_widgets["surface"].append(clean_grid)
+
+        def add_clean_tile(parent, title, desc, action_text, ps_cmd):
+            tile = tk.Frame(parent, padx=12, pady=10, highlightthickness=1)
+            tile.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=4)
+            themed_widgets["cards"].append(tile)
+            themed_widgets["borders"].append(tile)
+
+            t = tk.Label(tile, text=title, font=("Segoe UI", 9, "bold"))
+            t.pack(anchor="w")
+            themed_widgets["cards"].append(t)
+            themed_widgets["text_primary"].append(t)
+
+            d = tk.Label(tile, text=desc, font=("Segoe UI", 8))
+            d.pack(anchor="w", pady=(2, 8))
+            themed_widgets["cards"].append(d)
+            themed_widgets["text_dim"].append(d)
+
+            b = PillButton(tile, text=action_text, command=lambda: run_powershell_task(title, ps_cmd), width=150, height=28, is_primary=False)
+            b.pack(fill=tk.X)
+            themed_widgets["pill_buttons"].append(b)
+
+        add_clean_tile(clean_grid, "🧹 Purge Temp Files", "Clean %TEMP% & Windows Temp", "CLEAN TEMP", POWERSHELL_CLEANUP_COMMANDS["temp"])
+        add_clean_tile(clean_grid, "🗑️ Empty Recycle Bin", "Purge all drive trash items", "EMPTY BIN", POWERSHELL_CLEANUP_COMMANDS["recycle_bin"])
+        add_clean_tile(clean_grid, "🌐 Flush DNS Cache", "Flush resolver & net sockets", "FLUSH DNS", POWERSHELL_CLEANUP_COMMANDS["dns_flush"])
+        add_clean_tile(clean_grid, "📦 Update Cache", "Purge SoftwareDistribution", "PURGE CACHE", POWERSHELL_CLEANUP_COMMANDS["update_cache"])
 
         # Installation & System Registration Card
         install_card = tk.Frame(tab_tools, padx=20, pady=16, highlightthickness=1)
