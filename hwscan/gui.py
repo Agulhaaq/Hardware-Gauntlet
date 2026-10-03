@@ -11,6 +11,7 @@ Engineered with:
 
 import os
 import sys
+import platform
 import json
 import time
 import math
@@ -969,6 +970,9 @@ class HardwareGauntletGUI:
                     border_color=th["btn_border"]
                 )
 
+        self._root = root
+        self._switch_tab = switch_tab
+
         for idx, (title, width) in enumerate(tab_definitions):
             page_frame = tk.Frame(pages_container)
             tab_pages.append(page_frame)
@@ -1431,14 +1435,41 @@ class HardwareGauntletGUI:
         themed_widgets["treeviews"].append(tree_sec)
 
         # -------------------------------------------------------------
-        # Tab 8: System Tools, Diagnostics & Installation
+        # Tab 8: System Tools, Diagnostics & Installation (Scrollable)
         # -------------------------------------------------------------
-        lbl_tools_hdr = tk.Label(tab_tools, text="DIRECT OPERATING SYSTEM DIAGNOSTIC SHORTCUTS —", font=("Segoe UI", 11, "bold"))
+        canvas_tools = tk.Canvas(tab_tools, highlightthickness=0, bd=0)
+        scroll_tools = ttk.Scrollbar(tab_tools, orient=tk.VERTICAL, command=canvas_tools.yview)
+        tools_scroll_content = tk.Frame(canvas_tools)
+
+        tools_scroll_content.bind(
+            "<Configure>",
+            lambda e: canvas_tools.configure(scrollregion=canvas_tools.bbox("all"))
+        )
+        canvas_window = canvas_tools.create_window((0, 0), window=tools_scroll_content, anchor="nw")
+
+        def _on_canvas_configure(event):
+            canvas_tools.itemconfig(canvas_window, width=event.width)
+
+        canvas_tools.bind("<Configure>", _on_canvas_configure)
+        canvas_tools.configure(yscrollcommand=scroll_tools.set)
+
+        # Mouse wheel support
+        def _on_mousewheel(event):
+            canvas_tools.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas_tools.bind_all("<MouseWheel>", lambda e: _on_mousewheel(e) if active_tab_idx[0] == 7 else None)
+
+        canvas_tools.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll_tools.pack(side=tk.RIGHT, fill=tk.Y)
+        themed_widgets["root_bg"].append(canvas_tools)
+        themed_widgets["root_bg"].append(tools_scroll_content)
+
+        lbl_tools_hdr = tk.Label(tools_scroll_content, text="DIRECT OPERATING SYSTEM DIAGNOSTIC SHORTCUTS —", font=("Segoe UI", 11, "bold"))
         lbl_tools_hdr.pack(anchor="w", pady=(0, 14))
         themed_widgets["root_bg"].append(lbl_tools_hdr)
         themed_widgets["text_primary"].append(lbl_tools_hdr)
 
-        tools_grid = tk.Frame(tab_tools)
+        tools_grid = tk.Frame(tools_scroll_content)
         tools_grid.pack(fill=tk.X, pady=(0, 16))
         themed_widgets["root_bg"].append(tools_grid)
 
@@ -1481,7 +1512,7 @@ class HardwareGauntletGUI:
         # -------------------------------------------------------------
         # CARD 05 — All-Round System Optimization (Storage, RAM, CPU & Network)
         # -------------------------------------------------------------
-        cleanup_card = tk.Frame(tab_tools, padx=18, pady=14, highlightthickness=1)
+        cleanup_card = tk.Frame(tools_scroll_content, padx=18, pady=14, highlightthickness=1)
         cleanup_card.pack(fill=tk.X, pady=(0, 14))
         themed_widgets["surface"].append(cleanup_card)
         themed_widgets["borders"].append(cleanup_card)
@@ -1649,7 +1680,7 @@ class HardwareGauntletGUI:
         add_clean_tile(tune_clean_grid, "🛡️ Full Startup Suite", "Unified Latency Analysis", "RUN STARTUP SUITE", run_startup_optimization_suite, "Startup & Latency Suite")
 
         # Installation & System Registration Card
-        install_card = tk.Frame(tab_tools, padx=20, pady=16, highlightthickness=1)
+        install_card = tk.Frame(tools_scroll_content, padx=20, pady=16, highlightthickness=1)
         install_card.pack(fill=tk.BOTH, expand=True)
         themed_widgets["surface"].append(install_card)
         themed_widgets["borders"].append(install_card)
