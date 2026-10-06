@@ -35,6 +35,7 @@ class CPUInfo:
     features: List[str] = field(default_factory=list)
     cache_l2: str = "N/A"
     cache_l3: str = "N/A"
+    temperature_c: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

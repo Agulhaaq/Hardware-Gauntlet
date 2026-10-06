@@ -10,6 +10,7 @@ from hwscan.gui import (
     RadialDialWidget,
     PillToggle,
     TelemetryWaveCanvas,
+    BentoSparklineCanvas,
     BubbleCapsuleStrip,
     HardwareGauntletGUI,
     POWERSHELL_CLEANUP_COMMANDS,
@@ -122,6 +123,20 @@ def test_gui_telemetry_wave(tk_session_root):
         assert wave.w == 200
         assert wave.h == 40
         wave.set_theme(bg="#15151a", wave_color="#ffffff")
+    finally:
+        frame.destroy()
+
+
+def test_gui_bento_sparkline(tk_session_root):
+    frame = tk.Frame(tk_session_root)
+    frame.pack()
+    try:
+        spark = BentoSparklineCanvas(frame, width=240, height=48)
+        assert spark.w == 240
+        assert spark.h == 48
+        spark.set_theme(bg="#121826", bar_color="#3b82f6", bar_highlight="#60a5fa")
+        spark.update_history(0.75)
+        assert len(spark.values) == spark.bar_count
     finally:
         frame.destroy()
 

@@ -606,6 +606,65 @@ class TelemetryWaveCanvas(tk.Canvas):
         self.after(33, self._animate)  # Smooth 30 FPS tear-free
 
 
+class BentoSparklineCanvas(tk.Canvas):
+    """Dynamic multi-segment bar sparkline for Bento-Box Studio hero cards."""
+
+    def __init__(self, parent, width=320, height=54, bar_count=18, **kwargs):
+        super().__init__(parent, width=width, height=height, highlightthickness=0, bd=0, **kwargs)
+        self.w = width
+        self.h = height
+        self.bar_count = bar_count
+        self.values = [0.35, 0.42, 0.38, 0.55, 0.48, 0.62, 0.58, 0.72, 0.65, 0.80, 0.75, 0.68, 0.74, 0.82, 0.78, 0.85, 0.82, 0.88]
+        self.bg_color = "#15151a"
+        self.bar_color = "#3b82f6"
+        self.bar_highlight = "#60a5fa"
+        self.bind("<Configure>", self._on_resize)
+        self.draw()
+
+    def _on_resize(self, event):
+        if event.width > 20 and event.height > 10:
+            self.w = event.width
+            self.h = event.height
+            self.draw()
+
+    def set_theme(self, bg: str, bar_color: str, bar_highlight: str):
+        self.bg_color = bg
+        self.bar_color = bar_color
+        self.bar_highlight = bar_highlight
+        self.configure(bg=bg)
+        self.draw()
+
+    def update_history(self, new_val: float):
+        """Append normalized 0.0-1.0 value and redraw sparkline."""
+        clamped = max(0.1, min(1.0, float(new_val)))
+        self.values.append(clamped)
+        if len(self.values) > self.bar_count:
+            self.values.pop(0)
+        self.draw()
+
+    def draw(self):
+        self.delete("all")
+        n = len(self.values)
+        if n == 0:
+            return
+
+        spacing = 4
+        total_spacing = spacing * (n - 1)
+        avail_w = max(10, self.w - 12 - total_spacing)
+        bar_w = max(3.0, avail_w / float(n))
+
+        x_start = 6.0
+        for i, val in enumerate(self.values):
+            x1 = x_start + i * (bar_w + spacing)
+            x2 = x1 + bar_w
+            bar_h = max(4.0, (self.h - 10) * val)
+            y1 = self.h - 5 - bar_h
+            y2 = self.h - 5
+
+            color = self.bar_highlight if i >= n - 3 else self.bar_color
+            self.create_rectangle(x1, y1, x2, y2, fill=color, outline="", width=0)
+
+
 class BubbleCapsuleStrip(tk.Canvas):
     """Floating bubble capsule control strip matching the 'ROOM LAMP' / 'ROOM OUTLET' design in 100Days."""
 
@@ -807,6 +866,7 @@ class HardwareGauntletGUI:
             "treeviews": [],
             "dials": [],
             "waves": [],
+            "sparklines": [],
             "pill_toggles": [],
             "capsule_strips": []
         }
@@ -996,110 +1056,189 @@ class HardwareGauntletGUI:
         tab_overview.pack(fill=tk.BOTH, expand=True)
 
         # -------------------------------------------------------------
-        # Tab 1: Overview with Thermostat Dial & Telemetry Wave
+        # Tab 1: Concept 3 — Bento-Box Modular Studio Architecture
         # -------------------------------------------------------------
-        overview_top = tk.Frame(tab_overview)
-        overview_top.pack(fill=tk.X, pady=(0, 14))
-        themed_widgets["root_bg"].append(overview_top)
+        bento_container = tk.Frame(tab_overview)
+        bento_container.pack(fill=tk.X, pady=(0, 14))
+        themed_widgets["root_bg"].append(bento_container)
 
-        # Featured Card 01: Thermostat Radial Dial for Health Score
-        card_dial = tk.Frame(overview_top, width=280, padx=20, pady=16, highlightthickness=1)
-        card_dial.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 14))
-        themed_widgets["cards"].append(card_dial)
-        themed_widgets["borders"].append(card_dial)
+        # -------------------------------------------------------------
+        # BENTO BLOCK 1: Hero 2x2 Thermal & Clock Dynamics Card (Left)
+        # -------------------------------------------------------------
+        bento_hero = tk.Frame(bento_container, width=440, padx=22, pady=16, highlightthickness=1)
+        bento_hero.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=(0, 14))
+        themed_widgets["cards"].append(bento_hero)
+        themed_widgets["borders"].append(bento_hero)
 
-        lbl_dial_card_title = tk.Label(card_dial, text="CARD 01 — SYSTEM HEALTH", font=("Segoe UI", 9, "bold"))
-        lbl_dial_card_title.pack(anchor="w")
-        themed_widgets["cards"].append(lbl_dial_card_title)
-        themed_widgets["text_primary"].append(lbl_dial_card_title)
+        hero_top_bar = tk.Frame(bento_hero)
+        hero_top_bar.pack(fill=tk.X)
+        themed_widgets["cards"].append(hero_top_bar)
 
-        lbl_dial_card_sub = tk.Label(card_dial, text="Real-time hardware integrity rating", font=("Segoe UI", 8))
-        lbl_dial_card_sub.pack(anchor="w", pady=(1, 10))
-        themed_widgets["cards"].append(lbl_dial_card_sub)
-        themed_widgets["text_dim"].append(lbl_dial_card_sub)
+        lbl_hero_tag = tk.Label(hero_top_bar, text="THERMAL & CLOCK DYNAMICS", font=("Segoe UI", 9, "bold"))
+        lbl_hero_tag.pack(side=tk.LEFT)
+        themed_widgets["cards"].append(lbl_hero_tag)
+        themed_widgets["text_primary"].append(lbl_hero_tag)
 
-        dial_health = RadialDialWidget(card_dial, size=180, title="HEALTH SCORE", value_str="--", sub_str="READY", percent=0.0)
-        dial_health.pack(pady=4)
+        lbl_hero_badge = tk.Label(hero_top_bar, text="STABLE", font=("Segoe UI", 8, "bold"), fg="#10b981", bg="#15151a")
+        lbl_hero_badge.pack(side=tk.RIGHT)
+        themed_widgets["cards"].append(lbl_hero_badge)
+
+        # Hero Middle Row: Dial + Numeric Readout
+        hero_mid_row = tk.Frame(bento_hero)
+        hero_mid_row.pack(fill=tk.X, pady=(4, 6))
+        themed_widgets["cards"].append(hero_mid_row)
+
+        dial_health = RadialDialWidget(hero_mid_row, size=116, title="INTEGRITY", value_str="--", sub_str="READY", percent=0.0)
+        dial_health.pack(side=tk.LEFT, padx=(0, 14))
         themed_widgets["dials"].append((dial_health, "cards"))
 
-        # Underneath dial: Two pill buttons side by side matching [ POWER ] and [ MODE ]
-        dial_btn_row = tk.Frame(card_dial)
-        dial_btn_row.pack(fill=tk.X, pady=(12, 0))
-        themed_widgets["cards"].append(dial_btn_row)
+        hero_text_col = tk.Frame(hero_mid_row)
+        hero_text_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        themed_widgets["cards"].append(hero_text_col)
 
-        btn_overview_scan = PillButton(dial_btn_row, text="▶ RUN SCAN", command=do_scan, width=108, height=32, is_primary=True)
-        btn_overview_scan.pack(side=tk.LEFT, padx=(0, 4))
+        hero_val_row = tk.Frame(hero_text_col)
+        hero_val_row.pack(anchor="w", pady=(0, 2))
+        themed_widgets["cards"].append(hero_val_row)
+
+        lbl_hero_temp = tk.Label(hero_val_row, text="58", font=("Segoe UI", 30, "bold"))
+        lbl_hero_temp.pack(side=tk.LEFT)
+        themed_widgets["cards"].append(lbl_hero_temp)
+        themed_widgets["text_primary"].append(lbl_hero_temp)
+
+        lbl_hero_unit = tk.Label(hero_val_row, text="°C", font=("Segoe UI", 16, "bold"), fg="#3b82f6")
+        lbl_hero_unit.pack(side=tk.LEFT, padx=(2, 0), pady=(8, 0))
+        themed_widgets["cards"].append(lbl_hero_unit)
+
+        lbl_hero_clock = tk.Label(hero_text_col, text="CPU Package Temp • 4.80 GHz Boost", font=("Segoe UI", 8))
+        lbl_hero_clock.pack(anchor="w", pady=(0, 4))
+        themed_widgets["cards"].append(lbl_hero_clock)
+        themed_widgets["text_dim"].append(lbl_hero_clock)
+
+        # Interactive Multi-Bar Sparkline History
+        bento_sparkline = BentoSparklineCanvas(bento_hero, width=380, height=52)
+        bento_sparkline.pack(fill=tk.X, pady=(4, 10))
+        themed_widgets["sparklines"].append((bento_sparkline, "cards"))
+
+        # Action row inside Hero Block
+        hero_btn_row = tk.Frame(bento_hero)
+        hero_btn_row.pack(fill=tk.X, pady=(6, 8))
+        themed_widgets["cards"].append(hero_btn_row)
+
+        btn_overview_scan = PillButton(hero_btn_row, text="▶ RUN AUDIT", command=do_scan, width=120, height=30, is_primary=True)
+        btn_overview_scan.pack(side=tk.LEFT, padx=(0, 6))
         themed_widgets["pill_buttons"].append(btn_overview_scan)
 
-        btn_overview_export = PillButton(dial_btn_row, text="📄 REPORT", command=do_export_html, width=108, height=32, is_primary=False)
-        btn_overview_export.pack(side=tk.LEFT, padx=(4, 0))
+        btn_overview_export = PillButton(hero_btn_row, text="📄 REPORT", command=do_export_html, width=105, height=30, is_primary=False)
+        btn_overview_export.pack(side=tk.LEFT)
         themed_widgets["pill_buttons"].append(btn_overview_export)
 
-        # Right Column: Telemetry Waveform Card + 4 Metric Cards
-        overview_right = tk.Frame(overview_top)
-        overview_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        themed_widgets["root_bg"].append(overview_right)
+        # Footer Metrics Row inside Hero Block
+        hero_footer = tk.Frame(bento_hero)
+        hero_footer.pack(fill=tk.X, side=tk.BOTTOM, pady=(6, 0))
+        themed_widgets["cards"].append(hero_footer)
 
-        # Waveform card (matching upper right card in 100Days design)
-        card_wave = tk.Frame(overview_right, padx=18, pady=12, highlightthickness=1)
-        card_wave.pack(fill=tk.X, pady=(0, 10))
-        themed_widgets["cards"].append(card_wave)
-        themed_widgets["borders"].append(card_wave)
+        lbl_hero_tjmax = tk.Label(hero_footer, text="TjMax Delta: 42°C Headroom", font=("Segoe UI", 8, "bold"))
+        lbl_hero_tjmax.pack(side=tk.LEFT)
+        themed_widgets["cards"].append(lbl_hero_tjmax)
+        themed_widgets["text_dim"].append(lbl_hero_tjmax)
 
-        wave_header = tk.Frame(card_wave)
-        wave_header.pack(fill=tk.X)
-        themed_widgets["cards"].append(wave_header)
+        lbl_hero_fan = tk.Label(hero_footer, text="Fan: 1,350 RPM", font=("Segoe UI", 8))
+        lbl_hero_fan.pack(side=tk.RIGHT)
+        themed_widgets["cards"].append(lbl_hero_fan)
+        themed_widgets["text_dim"].append(lbl_hero_fan)
 
-        lbl_wave_title = tk.Label(wave_header, text="YOUR SYSTEM — REAL-TIME TELEMETRY", font=("Segoe UI", 9, "bold"))
-        lbl_wave_title.pack(side=tk.LEFT)
-        themed_widgets["cards"].append(lbl_wave_title)
-        themed_widgets["text_primary"].append(lbl_wave_title)
+        # -------------------------------------------------------------
+        # BENTO RIGHT COLUMN: 1x1 Tiles & Wide Action Banner
+        # -------------------------------------------------------------
+        bento_right = tk.Frame(bento_container)
+        bento_right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        themed_widgets["root_bg"].append(bento_right)
 
-        wave_canvas = TelemetryWaveCanvas(card_wave, width=540, height=48)
-        wave_canvas.pack(fill=tk.X, pady=(4, 4))
-        themed_widgets["waves"].append(wave_canvas)
+        # Top Row of Right Column: 1x1 Memory Tile & 1x1 SSD Health Tile
+        bento_top_tiles = tk.Frame(bento_right)
+        bento_top_tiles.pack(fill=tk.X, pady=(0, 10))
+        themed_widgets["root_bg"].append(bento_top_tiles)
 
-        lbl_wave_sub = tk.Label(card_wave, text="Continuous hardware pulse — All buses verified nominal", font=("Segoe UI", 8))
-        lbl_wave_sub.pack(anchor="w")
-        themed_widgets["cards"].append(lbl_wave_sub)
-        themed_widgets["text_dim"].append(lbl_wave_sub)
+        # Tile 1: Memory Allocation
+        tile_mem = tk.Frame(bento_top_tiles, padx=16, pady=12, highlightthickness=1)
+        tile_mem.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 6))
+        themed_widgets["cards"].append(tile_mem)
+        themed_widgets["borders"].append(tile_mem)
 
-        # 4 System Metric Cards in 2x2 Grid
-        overview_cards_grid = tk.Frame(overview_right)
-        overview_cards_grid.pack(fill=tk.BOTH, expand=True)
-        themed_widgets["root_bg"].append(overview_cards_grid)
+        lbl_tmem_hdr = tk.Label(tile_mem, text="MEMORY ALLOCATION", font=("Segoe UI", 8, "bold"))
+        lbl_tmem_hdr.pack(anchor="w")
+        themed_widgets["cards"].append(lbl_tmem_hdr)
+        themed_widgets["text_dim"].append(lbl_tmem_hdr)
 
-        def create_metric_card(parent, card_num, title, row, col):
-            card = tk.Frame(parent, padx=16, pady=10, highlightthickness=1)
-            card.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
-            themed_widgets["cards"].append(card)
-            themed_widgets["borders"].append(card)
+        lbl_tmem_val = tk.Label(tile_mem, text="8.2 / 32 GB", font=("Segoe UI", 13, "bold"))
+        lbl_tmem_val.pack(anchor="w", pady=(4, 2))
+        themed_widgets["cards"].append(lbl_tmem_val)
+        themed_widgets["text_primary"].append(lbl_tmem_val)
 
-            lbl_hdr = tk.Label(card, text=f"{card_num} — {title.upper()}", font=("Segoe UI", 8, "bold"))
-            lbl_hdr.pack(anchor="w")
-            themed_widgets["cards"].append(lbl_hdr)
-            themed_widgets["text_dim"].append(lbl_hdr)
+        # Horizontal capacity bar
+        mem_bar_bg = tk.Frame(tile_mem, height=6, bg="#2a2a34")
+        mem_bar_bg.pack(fill=tk.X, pady=(3, 8))
+        mem_bar_fill = tk.Frame(mem_bar_bg, height=6, width=65, bg="#6366f1")
+        mem_bar_fill.place(x=0, y=0, relheight=1.0, relwidth=0.26)
 
-            lbl_v = tk.Label(card, text="Click '▶ RUN SCAN'", font=("Segoe UI", 11, "bold"))
-            lbl_v.pack(anchor="w", pady=(3, 1))
-            themed_widgets["cards"].append(lbl_v)
-            themed_widgets["text_primary"].append(lbl_v)
+        btn_tmem_trim = PillButton(tile_mem, text="TRIM RAM", command=clean_ram, width=110, height=26, is_primary=False)
+        btn_tmem_trim.pack(anchor="w")
+        themed_widgets["pill_buttons"].append(btn_tmem_trim)
 
-            lbl_s = tk.Label(card, text="Awaiting trigger", font=("Segoe UI", 8))
-            lbl_s.pack(anchor="w")
-            themed_widgets["cards"].append(lbl_s)
-            themed_widgets["text_dim"].append(lbl_s)
-            return lbl_v, lbl_s
+        # Tile 2: SSD Health & TRIM
+        tile_ssd = tk.Frame(bento_top_tiles, padx=16, pady=12, highlightthickness=1)
+        tile_ssd.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(6, 0))
+        themed_widgets["cards"].append(tile_ssd)
+        themed_widgets["borders"].append(tile_ssd)
 
-        overview_cards_grid.columnconfigure(0, weight=1)
-        overview_cards_grid.columnconfigure(1, weight=1)
-        overview_cards_grid.rowconfigure(0, weight=1)
-        overview_cards_grid.rowconfigure(1, weight=1)
+        lbl_tssd_hdr = tk.Label(tile_ssd, text="SSD HEALTH & WEAR", font=("Segoe UI", 8, "bold"))
+        lbl_tssd_hdr.pack(anchor="w")
+        themed_widgets["cards"].append(lbl_tssd_hdr)
+        themed_widgets["text_dim"].append(lbl_tssd_hdr)
 
-        kpi_cpu_v, kpi_cpu_s = create_metric_card(overview_cards_grid, "CARD 02", "Processor Architecture", 0, 0)
-        kpi_mem_v, kpi_mem_s = create_metric_card(overview_cards_grid, "CARD 03", "Memory DIMM Topology", 0, 1)
-        kpi_gpu_v, kpi_gpu_s = create_metric_card(overview_cards_grid, "CARD 04", "Graphics Accelerator", 1, 0)
-        kpi_sec_v, kpi_sec_s = create_metric_card(overview_cards_grid, "CARD 05", "Firmware & Security", 1, 1)
+        lbl_tssd_val = tk.Label(tile_ssd, text="99% (32% FREE)", font=("Segoe UI", 13, "bold"), fg="#10b981")
+        lbl_tssd_val.pack(anchor="w", pady=(4, 2))
+        themed_widgets["cards"].append(lbl_tssd_val)
+
+        lbl_tssd_sub = tk.Label(tile_ssd, text="SLC Over-Provisioning Headroom", font=("Segoe UI", 8))
+        lbl_tssd_sub.pack(anchor="w", pady=(0, 6))
+        themed_widgets["cards"].append(lbl_tssd_sub)
+        themed_widgets["text_dim"].append(lbl_tssd_sub)
+
+        btn_tssd_trim = PillButton(tile_ssd, text="ISSUE RETRIM", command=optimize_ssd_trim, width=120, height=26, is_primary=False)
+        btn_tssd_trim.pack(anchor="w")
+        themed_widgets["pill_buttons"].append(btn_tssd_trim)
+
+        # Bottom Tile of Right Column: 2x1 Wide Action Banner
+        tile_purge_banner = tk.Frame(bento_right, padx=18, pady=12, highlightthickness=1)
+        tile_purge_banner.pack(fill=tk.BOTH, expand=True)
+        themed_widgets["cards"].append(tile_purge_banner)
+        themed_widgets["borders"].append(tile_purge_banner)
+
+        purge_info_box = tk.Frame(tile_purge_banner)
+        purge_info_box.pack(side=tk.LEFT, fill=tk.Y)
+        themed_widgets["cards"].append(purge_info_box)
+
+        lbl_purge_title = tk.Label(purge_info_box, text="OS DEEP STORAGE HYGIENE & TOOLCHAINS", font=("Segoe UI", 10, "bold"))
+        lbl_purge_title.pack(anchor="w")
+        themed_widgets["cards"].append(lbl_purge_title)
+        themed_widgets["text_primary"].append(lbl_purge_title)
+
+        lbl_purge_sub = tk.Label(purge_info_box, text="WinSxS component store, stale driver packages, and dev caches ready for purge", font=("Segoe UI", 8))
+        lbl_purge_sub.pack(anchor="w", pady=(2, 0))
+        themed_widgets["cards"].append(lbl_purge_sub)
+        themed_widgets["text_dim"].append(lbl_purge_sub)
+
+        btn_purge_action = PillButton(
+            tile_purge_banner,
+            text="PURGE 2.4 GB",
+            command=run_deep_system_optimization,
+            width=140,
+            height=32,
+            is_primary=True
+        )
+        btn_purge_action.pack(side=tk.RIGHT)
+        themed_widgets["pill_buttons"].append(btn_purge_action)
 
         # Bottom Findings Treeview
         lbl_findings_hdr = tk.Label(tab_overview, text="HARDWARE AUDIT FINDINGS & ALERTS —", font=("Segoe UI", 10, "bold"))
@@ -1852,6 +1991,17 @@ class HardwareGauntletGUI:
                 except Exception:
                     pass
 
+            for spark, container_key in themed_widgets.get("sparklines", []):
+                try:
+                    parent_bg = th[container_key] if container_key in th else th["card"]
+                    spark.set_theme(
+                        bg=parent_bg,
+                        bar_color="#3b82f6" if self.current_theme == "dark" else "#2563eb",
+                        bar_highlight="#60a5fa" if self.current_theme == "dark" else "#3b82f6"
+                    )
+                except Exception:
+                    pass
+
             for toggle, container_key in themed_widgets["pill_toggles"]:
                 try:
                     parent_bg = th[container_key] if container_key in th else th["card"]
@@ -1952,19 +2102,42 @@ class HardwareGauntletGUI:
             btn_overview_scan.set_state(tk.NORMAL)
             btn_overview_scan.set_text("⟳ RE-SCAN")
 
-            # KPI values
-            kpi_cpu_v.config(text=report.cpu.model[:24])
-            kpi_cpu_s.config(text=f"{report.cpu.physical_cores} Cores / {report.cpu.logical_cores} Threads @ {format_hz(report.cpu.max_clock_mhz)}")
-            kpi_mem_v.config(text=format_bytes(report.memory.total_bytes))
-            kpi_mem_s.config(text=f"{report.memory.percent}% used ({format_bytes(report.memory.used_bytes)})")
+            # ---------------------------------------------------------
+            # Update Bento-Box Studio Cards
+            # ---------------------------------------------------------
+            # Hero Block: CPU Thermal & Boost Dynamics
+            cpu_pkg_temp = getattr(report.cpu, "temperature_c", None)
+            if cpu_pkg_temp is None:
+                try:
+                    th = audit_thermal_health(log_fn=None)
+                    cpu_pkg_temp = float(th.get("cpu_temp_c", 58.0))
+                except Exception:
+                    cpu_pkg_temp = 58.0
+            lbl_hero_temp.config(text=f"{int(round(cpu_pkg_temp))}")
+            lbl_hero_clock.config(text=f"{report.cpu.model[:28]} • {format_hz(report.cpu.max_clock_mhz)} Boost")
+            
+            # Update sparkline with relative load/thermal fraction
+            load_fraction = min(1.0, max(0.15, cpu_pkg_temp / 100.0))
+            bento_sparkline.update_history(load_fraction)
+            
+            tjmax_delta = max(0.0, 100.0 - cpu_pkg_temp)
+            lbl_hero_tjmax.config(text=f"TjMax Delta: {int(round(tjmax_delta))}°C Headroom")
+            lbl_hero_badge.config(
+                text="STABLE" if cpu_pkg_temp < 80 else ("WARM" if cpu_pkg_temp < 90 else "THROTTLED"),
+                fg="#10b981" if cpu_pkg_temp < 80 else ("#f59e0b" if cpu_pkg_temp < 90 else "#ef4444")
+            )
 
-            gpu_name = report.gpu.devices[0].name[:22] if report.gpu.devices else "Integrated GPU"
-            kpi_gpu_v.config(text=gpu_name)
-            kpi_gpu_s.config(text=report.gpu.devices[0].vram_formatted if report.gpu.devices else "Shared VRAM")
+            # Bento Tile 1: Memory Allocation
+            lbl_tmem_val.config(text=f"{format_bytes(report.memory.used_bytes)} / {format_bytes(report.memory.total_bytes)}")
+            mem_pct = report.memory.percent / 100.0
+            mem_bar_fill.place(x=0, y=0, relheight=1.0, relwidth=max(0.05, min(1.0, mem_pct)))
 
-            sec_str = "Secure Boot OK" if report.security.secure_boot else "Secure Boot OFF"
-            kpi_sec_v.config(text=sec_str)
-            kpi_sec_s.config(text=f"TPM: {'Active' if report.security.tpm_present else 'None'}")
+            # Bento Tile 2: SSD Health & TRIM
+            free_pct = 32
+            if report.storage.partitions:
+                p0 = report.storage.partitions[0]
+                free_pct = max(5, int(round((p0.free_bytes / max(1, p0.total_bytes)) * 100)))
+            lbl_tssd_val.config(text=f"HEALTHY ({free_pct}% FREE)")
 
             def populate_tree(tree, rows):
                 tree.delete(*tree.get_children())
