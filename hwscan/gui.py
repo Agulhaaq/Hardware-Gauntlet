@@ -77,6 +77,8 @@ from hwscan.core.update_channel import (
     download_and_apply_patch
 )
 
+from hwscan.assets_data import LOGO_WHITE_B64, LOGO_BLACK_B64
+
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
@@ -861,6 +863,14 @@ class HardwareGauntletGUI:
             except Exception:
                 pass
 
+        png_path = get_asset_file_path("app.png")
+        if os.path.exists(png_path):
+            try:
+                app_png_icon = tk.PhotoImage(file=png_path)
+                root.iconphoto(True, app_png_icon)
+            except Exception:
+                pass
+
         themed_widgets = {
             "root_bg": [root],
             "surface": [],
@@ -984,15 +994,15 @@ class HardwareGauntletGUI:
             win.transient(root)
 
             th = THEMES[self.current_theme]
-            win.configure(bg=th["root_bg"])
+            win.configure(bg=th["bg"])
 
-            container = tk.Frame(win, bg=th["root_bg"], padx=24, pady=20)
+            container = tk.Frame(win, bg=th["bg"], padx=24, pady=20)
             container.pack(fill=tk.BOTH, expand=True)
 
-            lbl_mtitle = tk.Label(container, text="UPDATE CHANNEL & MODULAR PATCHING", font=("Segoe UI", 12, "bold"), fg=th["text_primary"], bg=th["root_bg"])
+            lbl_mtitle = tk.Label(container, text="UPDATE CHANNEL & MODULAR PATCHING", font=("Segoe UI", 12, "bold"), fg=th["text"], bg=th["bg"])
             lbl_mtitle.pack(anchor="w")
 
-            lbl_msub = tk.Label(container, text="Push and receive in-place upgrades without replacing your standalone executable.", font=("Segoe UI", 8), fg=th["text_dim"], bg=th["root_bg"])
+            lbl_msub = tk.Label(container, text="Push and receive in-place upgrades without replacing your standalone executable.", font=("Segoe UI", 8), fg=th["text_dim"], bg=th["bg"])
             lbl_msub.pack(anchor="w", pady=(2, 14))
 
             # Channel Card
@@ -1002,7 +1012,7 @@ class HardwareGauntletGUI:
             row_sel = tk.Frame(card, bg=th["card"])
             row_sel.pack(fill=tk.X, pady=(0, 8))
 
-            lbl_c_prompt = tk.Label(row_sel, text="Active Channel:", font=("Segoe UI", 9, "bold"), fg=th["text_primary"], bg=th["card"])
+            lbl_c_prompt = tk.Label(row_sel, text="Active Channel:", font=("Segoe UI", 9, "bold"), fg=th["text"], bg=th["card"])
             lbl_c_prompt.pack(side=tk.LEFT)
 
             cur_ch = get_current_channel()
@@ -1023,10 +1033,10 @@ class HardwareGauntletGUI:
             lbl_meta_text.pack(anchor="w")
 
             # Status log
-            lbl_log_h = tk.Label(container, text="CHANNEL LOG & STATUS —", font=("Segoe UI", 8, "bold"), fg=th["text_dim"], bg=th["root_bg"])
+            lbl_log_h = tk.Label(container, text="CHANNEL LOG & STATUS —", font=("Segoe UI", 8, "bold"), fg=th["text_dim"], bg=th["bg"])
             lbl_log_h.pack(anchor="w", pady=(2, 4))
 
-            log_box = tk.Text(container, height=7, bg=th["card_alt"], fg=th["text_primary"], font=("Consolas", 8), relief="flat", highlightbackground=th["border"], highlightthickness=1, padx=8, pady=8)
+            log_box = tk.Text(container, height=7, bg=th["card_alt"], fg=th["text"], font=("Consolas", 8), relief="flat", highlightbackground=th["border"], highlightthickness=1, padx=8, pady=8)
             log_box.pack(fill=tk.X, pady=(0, 14))
             log_box.insert("end", f"[*] Channel: {cur_ch.upper()} | Base: v{__version__}\n[*] Ready to query remote manifest or load local patch bundles.\n")
             log_box.config(state="disabled")
@@ -1037,7 +1047,7 @@ class HardwareGauntletGUI:
                 log_box.see("end")
                 log_box.config(state="disabled")
 
-            actions_f = tk.Frame(container, bg=th["root_bg"])
+            actions_f = tk.Frame(container, bg=th["bg"])
             actions_f.pack(fill=tk.X)
 
             latest_m = [None]
@@ -1119,6 +1129,9 @@ class HardwareGauntletGUI:
 
             btn_r = PillButton(actions_f, text="↺ ROLLBACK", command=on_rollback, width=96, height=32, is_primary=False)
             btn_r.pack(side=tk.LEFT)
+
+            for b in [btn_c, btn_a, btn_l, btn_r]:
+                b.set_theme(th["bg"], th["accent"], th["accent_text"], th["btn_bg"], th["btn_fg"], th["btn_border"])
 
         # Pill Buttons in Header
         btn_scan = PillButton(btn_frame, text="▶ RUN SCAN", command=do_scan, width=116, height=32, is_primary=True)
@@ -2043,6 +2056,14 @@ class HardwareGauntletGUI:
                     return img
                 except Exception:
                     pass
+            # Robust fallback to embedded base64 in binary or isolated memory
+            try:
+                b64_data = LOGO_WHITE_B64 if theme_name == "dark" else LOGO_BLACK_B64
+                img = tk.PhotoImage(data=b64_data)
+                logo_cache[theme_name] = img
+                return img
+            except Exception:
+                pass
             return None
 
         def apply_current_theme():
