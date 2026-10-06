@@ -1,7 +1,8 @@
 """Single-Instance Mutex and Process Management for Standalone Portable Hardware Gauntlet.
 
-Ensures that only 1 instance of Hardware Gauntlet runs at a time, restoring and
-bringing an existing window to the foreground if launched repeatedly.
+Ensures that only 1 instance of Hardware Gauntlet runs at a time.
+Re-launching the executable restores and brings the existing window to the foreground.
+Requires zero installation, creates zero temporary lock pollution, and writes no registry keys.
 """
 
 import os
@@ -34,7 +35,7 @@ def find_existing_window(window_title: str = WINDOW_TITLE) -> Optional[int]:
                     buff = ctypes.create_unicode_buffer(length + 1)
                     user32.GetWindowTextW(h, buff, length + 1)
                     title = buff.value
-                    if "Hardware Gauntlet" in title and "Launcher" not in title and "Setup" not in title:
+                    if "Hardware Gauntlet" in title and "Launcher" not in title:
                         found_hwnds.append(h)
                         return False
                 return True

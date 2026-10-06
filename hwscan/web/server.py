@@ -430,8 +430,8 @@ class HardwareServerHandler(BaseHTTPRequestHandler):
         self.wfile.write(data.encode("utf-8"))
 
     def _handle_install_ps1(self):
-        script = """# Hardware Gauntlet Automated Windows Installer
-Write-Host "Installing & Running Hardware Gauntlet..." -ForegroundColor Cyan
+        script = """# Hardware Gauntlet Standalone Portable Windows Runner (Zero Installation)
+Write-Host "Starting Standalone Portable Hardware Gauntlet..." -ForegroundColor Cyan
 if (Get-Command python -ErrorAction SilentlyContinue) {
     python -m pip install psutil rich --quiet
     python -m hwscan
@@ -449,8 +449,8 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 
     def _handle_install_sh(self):
         script = """#!/usr/bin/env bash
-# Hardware Gauntlet Automated Linux/macOS Installer
-echo "=== Installing & Running Hardware Gauntlet ==="
+# Hardware Gauntlet Standalone Portable Unix Runner (Zero Installation)
+echo "=== Starting Standalone Portable Hardware Gauntlet ==="
 if command -v python3 >/dev/null 2>&1; then
     python3 -m pip install psutil rich --quiet 2>/dev/null || true
     python3 -m hwscan

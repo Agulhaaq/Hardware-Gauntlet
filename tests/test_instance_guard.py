@@ -1,7 +1,7 @@
 """Unit tests for standalone single-instance mutex and window management."""
 
 import pytest
-from hwscan.core.installer_integration import (
+from hwscan.core.instance_guard import (
     acquire_single_instance_lock,
     release_single_instance_lock,
     find_existing_window,

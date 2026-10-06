@@ -27,7 +27,7 @@ from hwscan.reporters.html_reporter import HTMLReporter
 from hwscan.reporters.json_reporter import JSONReporter
 from hwscan.core.utils import format_bytes, format_hz
 from hwscan.core.stress_test import StressTestEngine
-from hwscan.core.installer_integration import (
+from hwscan.core.instance_guard import (
     acquire_single_instance_lock,
     WINDOW_TITLE
 )
@@ -227,7 +227,7 @@ def execute_powershell_cleanup(script: str, timeout: int = 60) -> Tuple[int, str
 
 
 def get_asset_file_path(filename: str) -> str:
-    """Resolve asset paths whether running from source, PyInstaller bundle, or installed directory."""
+    """Resolve asset paths for standalone portable executable, PyInstaller bundle, or local source."""
     candidates = []
     if hasattr(sys, "_MEIPASS"):
         candidates.append(os.path.join(sys._MEIPASS, "assets", filename))
@@ -238,9 +238,6 @@ def get_asset_file_path(filename: str) -> str:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidates.append(os.path.join(repo_root, "assets", filename))
     candidates.append(os.path.join(repo_root, filename))
-    appdata = os.environ.get("LOCALAPPDATA", "")
-    if appdata:
-        candidates.append(os.path.join(appdata, "Programs", "HardwareGauntlet", "assets", filename))
 
     for p in candidates:
         if os.path.exists(p):

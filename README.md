@@ -71,7 +71,7 @@ hwscan
   - **Disk Sequential I/O**: Measures sustained sequential Write and Read speeds in MB/s.
   - **Thermal & Throttling Monitor**: Live GPU temperatures (`nvidia-smi`), clock frequency throttling, and stability verdicts (`PASSED` vs `FAILED`).
   - **Windows Benchmark Shortcuts**: 1-click execution for `mdsched.exe` (Windows Memory Diagnostic), `perfmon.exe /report`, `winsat.exe`, and `dxdiag.exe`.
-- **📦 1-Click In-App Installation**: Built-in "📦 Install to PC" button installs to `%LOCALAPPDATA%\Programs\HardwareGauntlet`, creates Desktop & Start Menu shortcuts, registers in Windows Settings Installed Apps, and binds `hwscan` to User `PATH`.
+- **⚡ Zero Installation Required**: 100% portable standalone executable. Leaves zero temporary residue, creates no registry keys, requires no installation, and runs directly from anywhere (USB drive, Desktop, Downloads).
 - **🧠 Deep CPU Telemetry**: Cores (physical/logical), base & max frequencies, L1/L2/L3 cache sizes, architecture, instruction sets (AVX, AVX2, SSE4.2, AES-NI), and real-time utilization.
 - **📊 Motherboard & BIOS Audit**: Manufacturer, board model, revision, serial number, BIOS vendor, version, release date, and chassis form factor.
 - **💾 Memory (RAM) & DIMM Slots**: Total & used RAM, swap/pagefile, individual DIMM slot labels, module capacity, speed (MHz), memory technology (DDR4, DDR5, LPDDR5), manufacturer, and part numbers.
@@ -145,7 +145,7 @@ Hardware-Gauntlet/
 │   │   ├── models.py         # Hardware dataclasses & JSON serializers
 │   │   ├── system_info.py    # Master engine & health scoring
 │   │   ├── stress_test.py    # Multi-core CPU, RAM pattern, and disk throughput engine
-│   │   ├── installer_integration.py # Single-instance mutex and in-app system installer
+│   │   ├── instance_guard.py    # Single-instance mutex and foreground window manager
 │   │   └── utils.py          # Cross-platform subprocess & formatters
 │   ├── scanners/
 │   │   ├── base.py           # BaseScanner interface
@@ -167,8 +167,8 @@ Hardware-Gauntlet/
 │   └── web/
 │       └── server.py         # HTTP server & Multi-OS download portal
 ├── distribution/
-│   ├── install.ps1           # 1-liner Windows installer
-│   ├── install.sh            # 1-liner Linux/macOS installer
+│   ├── install.ps1           # 1-liner portable Windows runner (zero install)
+│   ├── install.sh            # 1-liner portable Unix runner (zero install)
 │   └── download_page.html    # Standalone static download landing page
 ├── .github/
 │   └── workflows/
