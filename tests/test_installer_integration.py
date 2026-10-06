@@ -1,40 +1,28 @@
-"""Unit tests for installer_integration in hwscan.core."""
+"""Unit tests for standalone single-instance mutex and window management."""
 
-import os
-import sys
 import pytest
 from hwscan.core.installer_integration import (
     acquire_single_instance_lock,
-    get_install_directory,
-    is_installed,
-    uninstall_application
+    release_single_instance_lock,
+    find_existing_window,
+    focus_window,
+    WINDOW_TITLE
 )
 
 
-def test_get_install_directory():
-    install_dir = get_install_directory()
-    assert isinstance(install_dir, str)
-    assert len(install_dir) > 0
-    assert "HardwareGauntlet" in install_dir or "hardware-gauntlet" in install_dir
+def test_window_title_constant():
+    assert "Hardware Gauntlet" in WINDOW_TITLE
 
 
-def test_acquire_single_instance_lock():
-    # Calling acquire_single_instance_lock in test runner should succeed
+def test_acquire_and_release_single_instance_lock():
     res = acquire_single_instance_lock("Test_Unique_Window_Title_12345")
     assert isinstance(res, bool)
+    release_single_instance_lock()
 
 
-def test_is_installed():
-    res = is_installed()
-    assert isinstance(res, bool)
-
-
-def test_uninstall_when_not_installed(monkeypatch):
-    # Test uninstall with nonexistent uninstall.ps1
-    monkeypatch.setattr(
-        "hwscan.core.installer_integration.get_install_directory",
-        lambda: "C:\\NonExistent_Test_Directory_12345"
-    )
-    success, msg = uninstall_application()
-    assert not success
-    assert "Uninstaller not found" in msg
+def test_find_and_focus_window():
+    # Searching for nonexistent window should return None safely
+    hwnd = find_existing_window("Nonexistent_Window_Title_XYZ_99999")
+    assert hwnd is None
+    # Calling focus_window with None or 0 should not raise
+    focus_window(0)

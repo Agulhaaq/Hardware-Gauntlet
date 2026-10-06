@@ -47,18 +47,14 @@ def test_dist_executables_exist():
     dist_dir = os.path.join(base_dir, "dist")
 
     hg_exe = os.path.join(dist_dir, "HardwareGauntlet.exe")
-    setup_exe = os.path.join(dist_dir, "Setup-HardwareGauntlet.exe")
 
     assert os.path.exists(hg_exe), f"Missing {hg_exe}"
-    assert os.path.exists(setup_exe), f"Missing {setup_exe}"
     assert os.path.getsize(hg_exe) > 10_000_000
-    assert os.path.getsize(setup_exe) > 10_000_000
 
 
 def test_root_executables_exist():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     root_hg_exe = os.path.join(base_dir, "HardwareGauntlet.exe")
-    root_setup_exe = os.path.join(base_dir, "Setup-HardwareGauntlet.exe")
 
     assert os.path.exists(root_hg_exe), f"Missing {root_hg_exe}"
-    assert os.path.exists(root_setup_exe), f"Missing {root_setup_exe}"
+    assert os.path.getsize(root_hg_exe) > 10_000_000

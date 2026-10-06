@@ -20,21 +20,17 @@ Hardware Gauntlet is engineered strictly for **single-instance standalone execut
 
 | Mode | Windows | Linux / macOS | What Happens |
 | :--- | :--- | :--- | :--- |
-| **🚀 Desktop GUI (Single Instance)** | Double-click `HardwareGauntlet.exe`<br>or `Run-Portable.bat` | `./run-portable.sh` | Opens the standalone desktop UI. If already running, focuses the existing instance. |
-| **⚡ Single Instance Launcher** | Double-click `Setup-HardwareGauntlet.exe` | `./run-portable.sh` | Launches or focuses the single application window. |
+| **🚀 Standalone Portable GUI** | Double-click `HardwareGauntlet.exe`<br>or `Run-Portable.bat` | `./run-portable.sh` | Opens the standalone desktop UI. If already running, focuses the existing instance. |
 | **🎛️ Terminal Launcher** | Double-click `Run-HardwareGauntlet.bat` | `./run-portable.sh` | Interactive prompt to launch the single GUI instance or run terminal CLI diagnostics. |
 
 ---
 
-### 🐧 Linux & 🍎 macOS Details
+### ⚡ Pure Standalone & Portable Architecture
 
-- **⚡ Just Run (Portable)**:
-  ```bash
-  ./run-portable.sh
-  ```
-- **📦 Permanent Installation**:
-  - **Linux**: `bash installer/install-linux.sh` (installs binary to `~/.local/bin`, creates `.desktop` menu shortcut)
-  - **macOS**: `bash installer/install-macos.sh` (installs `Hardware Gauntlet.app` into `/Applications` with Spotlight search)
+Hardware Gauntlet is 100% portable and requires zero installation:
+- **Zero Registry Bloat**: Does not register uninstaller entries or modify system registry hives.
+- **Self-Contained Executable**: Single standalone `.exe` with all dependencies, assets, and diagnostic engines bundled in-memory.
+- **Single-Instance Enforcement**: Re-launching `HardwareGauntlet.exe` automatically detects the active instance and brings it directly to the foreground.
 
 ---
 
