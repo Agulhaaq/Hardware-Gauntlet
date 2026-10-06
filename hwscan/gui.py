@@ -64,6 +64,18 @@ from hwscan.core.startup_service_tuner import (
     audit_power_and_latency_profiles,
     run_startup_optimization_suite
 )
+from hwscan import __version__
+from hwscan.core.update_channel import (
+    CHANNELS,
+    DEFAULT_CHANNEL,
+    get_current_channel,
+    set_current_channel,
+    check_for_updates,
+    apply_patch_bundle,
+    rollback_patch,
+    get_active_patch_metadata,
+    download_and_apply_patch
+)
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -964,10 +976,158 @@ class HardwareGauntletGUI:
             except Exception as err:
                 messagebox.showerror("Tool Error", f"Unable to launch {tool_cmd}:\n{err}")
 
+        def open_update_channel_modal():
+            win = tk.Toplevel(root)
+            win.title("Hardware Gauntlet — Update Channel Manager")
+            win.geometry("590x490")
+            win.minsize(520, 440)
+            win.transient(root)
+
+            th = THEMES[self.current_theme]
+            win.configure(bg=th["root_bg"])
+
+            container = tk.Frame(win, bg=th["root_bg"], padx=24, pady=20)
+            container.pack(fill=tk.BOTH, expand=True)
+
+            lbl_mtitle = tk.Label(container, text="UPDATE CHANNEL & MODULAR PATCHING", font=("Segoe UI", 12, "bold"), fg=th["text_primary"], bg=th["root_bg"])
+            lbl_mtitle.pack(anchor="w")
+
+            lbl_msub = tk.Label(container, text="Push and receive in-place upgrades without replacing your standalone executable.", font=("Segoe UI", 8), fg=th["text_dim"], bg=th["root_bg"])
+            lbl_msub.pack(anchor="w", pady=(2, 14))
+
+            # Channel Card
+            card = tk.Frame(container, bg=th["card"], highlightbackground=th["border"], highlightthickness=1, padx=16, pady=12)
+            card.pack(fill=tk.X, pady=(0, 12))
+
+            row_sel = tk.Frame(card, bg=th["card"])
+            row_sel.pack(fill=tk.X, pady=(0, 8))
+
+            lbl_c_prompt = tk.Label(row_sel, text="Active Channel:", font=("Segoe UI", 9, "bold"), fg=th["text_primary"], bg=th["card"])
+            lbl_c_prompt.pack(side=tk.LEFT)
+
+            cur_ch = get_current_channel()
+            combo_var = tk.StringVar(value=cur_ch.upper())
+            combo_box = ttk.Combobox(row_sel, textvariable=combo_var, values=["STABLE", "BETA", "NIGHTLY"], state="readonly", width=12)
+            combo_box.pack(side=tk.LEFT, padx=(10, 0))
+
+            def on_select_ch(e):
+                new_c = combo_var.get().lower()
+                set_current_channel(new_c)
+                append_log(f"Switched active update channel to {new_c.upper()}")
+
+            combo_box.bind("<<ComboboxSelected>>", on_select_ch)
+
+            patch_meta = get_active_patch_metadata()
+            patch_disp = f"v{patch_meta.get('version')}" if patch_meta else "None (Factory Binary)"
+            lbl_meta_text = tk.Label(card, text=f"Base Executable: v{__version__}  •  Active Hot-Patch: {patch_disp}", font=("Segoe UI", 8), fg=th["text_dim"], bg=th["card"])
+            lbl_meta_text.pack(anchor="w")
+
+            # Status log
+            lbl_log_h = tk.Label(container, text="CHANNEL LOG & STATUS —", font=("Segoe UI", 8, "bold"), fg=th["text_dim"], bg=th["root_bg"])
+            lbl_log_h.pack(anchor="w", pady=(2, 4))
+
+            log_box = tk.Text(container, height=7, bg=th["card_alt"], fg=th["text_primary"], font=("Consolas", 8), relief="flat", highlightbackground=th["border"], highlightthickness=1, padx=8, pady=8)
+            log_box.pack(fill=tk.X, pady=(0, 14))
+            log_box.insert("end", f"[*] Channel: {cur_ch.upper()} | Base: v{__version__}\n[*] Ready to query remote manifest or load local patch bundles.\n")
+            log_box.config(state="disabled")
+
+            def append_log(msg):
+                log_box.config(state="normal")
+                log_box.insert("end", f"{msg}\n")
+                log_box.see("end")
+                log_box.config(state="disabled")
+
+            actions_f = tk.Frame(container, bg=th["root_bg"])
+            actions_f.pack(fill=tk.X)
+
+            latest_m = [None]
+
+            def on_check():
+                ch = combo_var.get().lower()
+                append_log(f"[*] Checking channel '{ch.upper()}' for updates...")
+                btn_c.set_state(tk.DISABLED)
+
+                def bg_chk():
+                    has_u, manifest, msg = check_for_updates(ch)
+                    def fin():
+                        btn_c.set_state(tk.NORMAL)
+                        append_log(f"[{'✓' if has_u else '*'}] {msg}")
+                        if manifest and has_u:
+                            latest_m[0] = manifest
+                            btn_a.set_state(tk.NORMAL)
+                            append_log(f"Ready to apply patch: v{manifest.version} ({manifest.patch_size_bytes} bytes)")
+                            for n in manifest.notes:
+                                append_log(f"  • {n}")
+                    win.after(0, fin)
+
+                threading.Thread(target=bg_chk, daemon=True).start()
+
+            def on_apply_remote():
+                if not latest_m[0]:
+                    messagebox.showinfo("Check Required", "Please check for updates first.")
+                    return
+                m = latest_m[0]
+                append_log(f"[*] Downloading and applying patch v{m.version}...")
+                btn_a.set_state(tk.DISABLED)
+
+                def bg_dl():
+                    ok, msg = download_and_apply_patch(m, log_fn=append_log)
+                    def fin_dl():
+                        btn_a.set_state(tk.NORMAL)
+                        if ok:
+                            messagebox.showinfo("Update Complete", f"Patch v{m.version} applied successfully!\nModules are loaded dynamically into runtime.")
+                            win.destroy()
+                        else:
+                            messagebox.showerror("Update Error", msg)
+                    win.after(0, fin_dl)
+
+                threading.Thread(target=bg_dl, daemon=True).start()
+
+            def on_apply_local():
+                f = filedialog.askopenfilename(
+                    parent=win,
+                    title="Select Hot-Patch ZIP Bundle",
+                    filetypes=[("Zip Patches", "*.zip"), ("All Files", "*.*")]
+                )
+                if f:
+                    append_log(f"[*] Applying local patch: {os.path.basename(f)}...")
+                    ok, msg = apply_patch_bundle(f, expected_sha256="")
+                    append_log(f"[{'✓' if ok else '!'}] {msg}")
+                    if ok:
+                        messagebox.showinfo("Local Patch Applied", f"Local patch bundle applied successfully!\nModules are loaded immediately into runtime path.")
+                        win.destroy()
+                    else:
+                        messagebox.showerror("Patch Error", msg)
+
+            def on_rollback():
+                if messagebox.askyesno("Rollback Patch", "Rollback active hot-patch and restore factory standalone executable?"):
+                    ok, msg = rollback_patch()
+                    append_log(f"[{'✓' if ok else '!'}] {msg}")
+                    if ok:
+                        messagebox.showinfo("Rollback Complete", "Reverted cleanly to factory standalone binary.")
+                        win.destroy()
+
+            btn_c = PillButton(actions_f, text="🔍 CHECK UPDATES", command=on_check, width=130, height=32, is_primary=True)
+            btn_c.pack(side=tk.LEFT, padx=(0, 6))
+
+            btn_a = PillButton(actions_f, text="📥 APPLY UPDATE", command=on_apply_remote, width=120, height=32, is_primary=False)
+            btn_a.pack(side=tk.LEFT, padx=(0, 6))
+            btn_a.set_state(tk.DISABLED)
+
+            btn_l = PillButton(actions_f, text="📂 LOAD LOCAL ZIP", command=on_apply_local, width=130, height=32, is_primary=False)
+            btn_l.pack(side=tk.LEFT, padx=(0, 6))
+
+            btn_r = PillButton(actions_f, text="↺ ROLLBACK", command=on_rollback, width=96, height=32, is_primary=False)
+            btn_r.pack(side=tk.LEFT)
+
         # Pill Buttons in Header
         btn_scan = PillButton(btn_frame, text="▶ RUN SCAN", command=do_scan, width=116, height=32, is_primary=True)
         btn_scan.pack(side=tk.LEFT, padx=3)
         themed_widgets["pill_buttons"].append(btn_scan)
+
+        btn_channel = PillButton(btn_frame, text="⚡ UPDATE", command=open_update_channel_modal, width=88, height=32, is_primary=False)
+        btn_channel.pack(side=tk.LEFT, padx=3)
+        themed_widgets["pill_buttons"].append(btn_channel)
 
         btn_theme = PillButton(btn_frame, text="☀️ LIGHT", command=toggle_theme, width=96, height=32, is_primary=False)
         btn_theme.pack(side=tk.LEFT, padx=3)

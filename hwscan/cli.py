@@ -92,7 +92,78 @@ def main():
         help="Check health score only and exit with code 0 (passed) or 1 (critical warnings)"
     )
 
+    parser.add_argument(
+        "--check-update",
+        action="store_true",
+        help="Check active update channel for available hot patches"
+    )
+
+    parser.add_argument(
+        "--channel",
+        nargs="?",
+        const="",
+        help="View or switch active update channel (stable, beta, nightly)"
+    )
+
+    parser.add_argument(
+        "--apply-patch",
+        metavar="PATCH_ZIP",
+        help="Manually apply a local modular hot-patch ZIP file"
+    )
+
+    parser.add_argument(
+        "--rollback-patch",
+        action="store_true",
+        help="Rollback any active modular hot-patch to restore factory standalone binary"
+    )
+
     args = parser.parse_args()
+
+    # Update Channel Operations
+    if args.check_update or args.channel is not None or args.apply_patch or args.rollback_patch:
+        from hwscan.core.update_channel import (
+            get_current_channel,
+            set_current_channel,
+            check_for_updates,
+            apply_patch_bundle,
+            rollback_patch,
+            get_active_patch_metadata
+        )
+
+        if args.channel:
+            set_current_channel(args.channel)
+            print(f"[✓] Active update channel switched to: {args.channel.upper()}")
+            return
+        elif args.channel == "":
+            curr = get_current_channel()
+            patch_meta = get_active_patch_metadata()
+            print(f"Active Update Channel: {curr.upper()} (Base App: v{__version__})")
+            if patch_meta:
+                print(f"Active Hot-Patch: v{patch_meta.get('version')} (Channel: {patch_meta.get('channel')})")
+            return
+
+        if args.apply_patch:
+            success, msg = apply_patch_bundle(args.apply_patch, expected_sha256="")
+            print(f"[{'✓' if success else '!'}] {msg}")
+            return
+
+        if args.rollback_patch:
+            success, msg = rollback_patch()
+            print(f"[{'✓' if success else '!'}] {msg}")
+            return
+
+        if args.check_update:
+            ch = get_current_channel()
+            print(f"[*] Checking update channel '{ch.upper()}'...")
+            has_update, manifest, msg = check_for_updates(ch)
+            print(f"[{'✓' if has_update else '*'}] {msg}")
+            if manifest and has_update:
+                print(f"\nRelease Notes for v{manifest.version}:")
+                for n in manifest.notes:
+                    print(f"  • {n}")
+                if manifest.patch_url:
+                    print(f"\nDownload: {manifest.patch_url}")
+            return
 
     # Web Server Mode
     if args.web:

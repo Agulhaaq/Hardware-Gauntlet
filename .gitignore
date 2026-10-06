@@ -28,6 +28,8 @@ ENV/
 !distribution/download_page.html
 *.json
 !hwscan/data/*.json
+!channels/*.json
+patches/
 *.md
 !README.md
 
