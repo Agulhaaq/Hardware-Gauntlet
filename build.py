@@ -39,6 +39,7 @@ def build():
         print("[!] PyInstaller is not installed. Installing via pip...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
 
+    sep = ";" if current_os == "windows" else ":"
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--clean",
@@ -47,8 +48,16 @@ def build():
         "--hidden-import", "rich",
         "--hidden-import", "psutil",
         "--hidden-import", "hwscan",
-        "hwscan/__main__.py"
+        "--hidden-import", "PIL",
     ]
+
+    if os.path.exists("assets"):
+        cmd.extend(["--add-data", f"assets{sep}assets"])
+
+    if current_os == "windows" and os.path.exists("assets/app.ico"):
+        cmd.extend(["--icon", "assets/app.ico"])
+
+    cmd.append("hwscan/__main__.py")
 
     print(f"[*] Running command: {' '.join(cmd)}")
     subprocess.check_call(cmd)

@@ -81,10 +81,29 @@ hwscan
 - **🔒 Hardware Security Checks**: UEFI Secure Boot state, TPM 2.0 presence and firmware version, and Hardware Virtualization (VT-x / AMD-V) status.
 - **🔋 Battery & Power Diagnostics**: Laptop battery percentage, AC adapter status, charge cycle counts, and capacity degradation.
 - **🎯 Intelligent Health Score (0-100)**: Evaluates overall hardware health, flags mismatched memory speeds, asymmetrical RAM capacity, critical disk usage, or disabled firmware security.
-- **🎨 Stealth Monochrome & Dual Theme Support**: Instant real-time toggling between `🌙 Dark Mode` (deep obsidian `#09090b`) and `☀️ Light Mode` (crisp modern slate `#f4f4f5`).
+- **🍱 Bento-Box Modular Studio (Concept 3 Layout)**:
+  - Ergonomic modular card grid displaying thermal & clock dynamics, real-time wave telemetries, memory allocation bars, SSD wear, and actionable audit findings.
+  - 8-tab studio suite: `Overview`, `Stress Test`, `CPU & Board`, `Memory`, `Graphics`, `Storage`, `Security`, and `Utilities`.
+- **⚡ In-Place Update Channel & Hot-Patch Engine**:
+  - Push and pull in-place upgrades without replacing your standalone executable or installer.
+  - Channels supported: `Stable`, `Beta`, and `Nightly` with remote JSON manifests and SHA-256 integrity checks.
+  - Atomic zip patch extraction with live dynamic module reloading into Python's runtime path.
+  - 1-click rollback back to factory binary state.
+- **🧹 OS Deep Storage Hygiene & Toolchains**:
+  - Cleans Windows Component Store (WinSxS), stale driver backup stores, volume shadow copies, and hibernation file overhead.
+  - Detects and clears multi-gigabyte developer caches: `.pip`, `.npm`, `.cargo`, `.nuget`, `.m2`, `Docker`, and `yarn`.
+- **🩺 Hardware Health & Physical Maintenance Guides**:
+  - Real-time NVMe & SSD lifetime write endurance calculations (TBW).
+  - Physical dust, thermal paste degradation, fan airflow clearance, and port contact cleaning checklists.
+- **⚡ Startup & Background Service Tuner**:
+  - Audits registry run keys, startup folders, and background Windows services.
+  - Measures system boot impact and optimizes high-overhead background processes.
+- **🎨 QK Brand Identity & Dual Theme Support**:
+  - Stark brutalist monochrome cyber aesthetic with razor-sharp contrast.
+  - Instant toggling between `🌙 Dark Mode` (obsidian void `#08080a`, slate `#25252e`, pure white `#ffffff`) and `☀️ Light Mode` (paper `#f5f5f7`, pure black `#09090b`).
 - **📄 Multi-Format Reporting**:
   - Interactive styled terminal dashboard (`rich` + auto ASCII fallback)
-  - Standalone single-file HTML audit report (interactive with print/PDF export)
+  - Standalone single-file HTML audit report (interactive with print/PDF export and embedded logo)
   - Machine-readable JSON
   - GitHub-flavored Markdown
 - **🌐 Built-in Web Server & Download Portal**: Run `hwscan --web` to launch a browser dashboard that detects client OS and serves custom downloads.
@@ -137,15 +156,28 @@ Open [http://localhost:8080](http://localhost:8080) in any browser to:
 
 ```
 Hardware-Gauntlet/
+├── assets/                   # Multi-resolution icons & brand assets
+│   ├── app.ico               # Windows multi-resolution PE icon (16..256px)
+│   ├── app.png               # High-res obsidian squircle app badge
+│   ├── logo_white_*.png      # White monochrome monogram variants
+│   └── logo_black_*.png      # Black monochrome monogram variants
 ├── hwscan/
 │   ├── __init__.py           # Package version & metadata
 │   ├── __main__.py           # python -m hwscan entrypoint
 │   ├── cli.py                # Command-line argument parsing
+│   ├── gui.py                # Bento-Box Studio Tkinter GUI & theme engine
+│   ├── assets_data.py        # In-memory base64 logo fallbacks
 │   ├── core/
 │   │   ├── models.py         # Hardware dataclasses & JSON serializers
 │   │   ├── system_info.py    # Master engine & health scoring
 │   │   ├── stress_test.py    # Multi-core CPU, RAM pattern, and disk throughput engine
-│   │   ├── instance_guard.py    # Single-instance mutex and foreground window manager
+│   │   ├── instance_guard.py # Single-instance mutex and foreground window manager
+│   │   ├── update_channel.py # In-place update channel & hot-patch engine
+│   │   ├── cleanup.py        # Basic temp, memory, and DNS resolver cleanup
+│   │   ├── deep_cleanup.py   # WinSxS, driver store, and developer cache hygiene
+│   │   ├── hardware_health.py # SSD TBW endurance & thermal stress analytics
+│   │   ├── physical_maintenance.py # Dust, thermal paste, and cleaning checklists
+│   │   ├── startup_service_tuner.py # Startup run keys & background services
 │   │   └── utils.py          # Cross-platform subprocess & formatters
 │   ├── scanners/
 │   │   ├── base.py           # BaseScanner interface
@@ -170,9 +202,14 @@ Hardware-Gauntlet/
 │   ├── install.ps1           # 1-liner portable Windows runner (zero install)
 │   ├── install.sh            # 1-liner portable Unix runner (zero install)
 │   └── download_page.html    # Standalone static download landing page
+├── scripts/
+│   ├── build_branding_assets.py # Multi-resolution brand asset generator
+│   └── capture_current_ui.py    # Automated headless UI capture harness
+├── tests/                    # 91 comprehensive automated pytest tests
 ├── .github/
 │   └── workflows/
-│       └── build-and-release.yml  # Multi-OS CI/CD build matrix
+│       └── build-and-release.yml # Multi-OS CI/CD build matrix
+├── HardwareGauntlet.spec     # Windows PyInstaller UPX spec
 ├── build.py                  # Standalone PyInstaller compiler script
 ├── pyproject.toml            # PEP 518/621 build configuration
 ├── setup.py                  # Setuptools configuration
