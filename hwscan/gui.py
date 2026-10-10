@@ -31,6 +31,7 @@ from hwscan.core.utils import format_bytes, format_hz
 from hwscan.core.stress_test import StressTestEngine
 from hwscan.core.instance_guard import (
     acquire_single_instance_lock,
+    release_single_instance_lock,
     WINDOW_TITLE
 )
 from hwscan.core.cleanup import (
@@ -2510,6 +2511,10 @@ class HardwareGauntletGUI:
         def on_window_close():
             try:
                 self.stress_engine.stop_test()
+            except Exception:
+                pass
+            try:
+                release_single_instance_lock()
             except Exception:
                 pass
             try:
