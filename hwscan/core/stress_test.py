@@ -99,13 +99,12 @@ class StressTestEngine:
     def _cpu_worker(self) -> None:
         """Worker thread for maxing out a CPU core with mathematical load."""
         while not self._stop_event.is_set():
-            # Mix floating-point, trigonometry and hashing
+            # Mix floating-point, trigonometry and hashing in tight chunks
             val = 0.0
-            for i in range(1000):
+            for i in range(20000):
                 val += math.sqrt(i + 1.0) * math.sin(i)
             # Short hash computation
             hashlib.sha256(str(val).encode("utf-8")).digest()
-            time.sleep(0.001)
 
     def _ram_worker(self, target_mb: int) -> None:
         """Allocates memory, writes alternating bit patterns, and verifies checksum integrity."""

@@ -139,3 +139,17 @@ def test_init_patch_loader(tmp_path, monkeypatch):
         assert sys.path[0] == target_patch_dir
     finally:
         sys.path = orig_sys_path
+
+
+def test_zip_slip_rejection(tmp_path):
+    bad_zip = tmp_path / "bad.zip"
+    with zipfile.ZipFile(str(bad_zip), "w") as zf:
+        zf.writestr("../evil.txt", "exploit")
+    hasher = hashlib.sha256()
+    hasher.update(bad_zip.read_bytes())
+    sha = hasher.hexdigest()
+
+    target_dir = str(tmp_path / "patches")
+    success, msg = apply_patch_bundle(str(bad_zip), sha, target_dir=target_dir)
+    assert not success
+    assert "traversal" in msg.lower()

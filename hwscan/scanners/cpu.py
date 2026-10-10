@@ -84,6 +84,29 @@ class CPUScanner(BaseScanner):
             features.extend(["VT-x", "AVX2", "SSE4.2", "AES-NI"])
         info.features = features
 
+        # Query CPU package temperature if available
+        try:
+            if psutil and hasattr(psutil, "sensors_temperatures"):
+                temps = psutil.sensors_temperatures()
+                if temps:
+                    for name in ["coretemp", "cpu_thermal", "k10temp", "zenpower", "cpu"]:
+                        if name in temps and temps[name]:
+                            info.temperature_c = float(temps[name][0].current)
+                            break
+            if info.temperature_c is None:
+                out = run_command(
+                    ["powershell.exe", "-NoProfile", "-Command",
+                     "Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction SilentlyContinue | Select-Object -ExpandProperty CurrentTemperature"],
+                    timeout=3
+                )
+                if out and out.strip().isdigit():
+                    k = int(out.strip())
+                    c = (k - 2732) / 10.0
+                    if 10 < c < 120:
+                        info.temperature_c = round(c, 1)
+        except Exception:
+            pass
+
     def _scan_linux(self, info: CPUInfo) -> None:
         # Try lscpu --json first
         lscpu_out = run_command(["lscpu", "--json"])
@@ -129,6 +152,17 @@ class CPUScanner(BaseScanner):
                                     info.features = [f.upper() for f in ["avx", "avx2", "sse4_2", "aes", "vmx", "svm"] if f in flags]
                 except Exception:
                     pass
+
+        try:
+            if psutil and hasattr(psutil, "sensors_temperatures"):
+                temps = psutil.sensors_temperatures()
+                if temps:
+                    for name in ["coretemp", "cpu_thermal", "k10temp", "zenpower", "cpu"]:
+                        if name in temps and temps[name]:
+                            info.temperature_c = float(temps[name][0].current)
+                            break
+        except Exception:
+            pass
 
     def _scan_macos(self, info: CPUInfo) -> None:
         brand = run_command(["sysctl", "-n", "machdep.cpu.brand_string"])

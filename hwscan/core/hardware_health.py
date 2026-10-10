@@ -222,11 +222,13 @@ def optimize_ssd_trim(log_fn: Optional[Callable[[str], None]] = None) -> Dict[st
     elif os_type == "macos":
         log("macOS APFS automatic block trim active.")
 
+    msg = f"Solid-state drive TRIM optimization issued.\nFree capacity: {round(free_pct, 1)}%.\nTRIM status: {'Enabled' if trim_supported else 'Disabled'}."
     return {
         "category": "ssd_trim",
         "trim_supported": trim_supported,
         "free_space_percent": round(free_pct, 1),
         "over_provision_warning": over_provision_warning,
+        "message": msg,
         "success": True
     }
 

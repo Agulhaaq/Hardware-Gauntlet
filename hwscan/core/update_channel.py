@@ -232,6 +232,11 @@ def apply_patch_bundle(
         os.makedirs(dest_dir, exist_ok=True)
 
         with zipfile.ZipFile(patch_zip_path, "r") as zf:
+            abs_dest = os.path.abspath(dest_dir)
+            for member in zf.infolist():
+                target_path = os.path.abspath(os.path.join(dest_dir, member.filename))
+                if not (target_path == abs_dest or target_path.startswith(abs_dest + os.sep)):
+                    return False, f"Malicious path traversal detected in patch archive: {member.filename}"
             zf.extractall(dest_dir)
 
         # Prepend to runtime path immediately

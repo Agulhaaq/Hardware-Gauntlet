@@ -116,6 +116,31 @@ def clean_storage(log_fn: Optional[Callable[[str], None]] = None) -> Dict[str, A
                 total_files += f
                 total_dirs += d
 
+            d3d_cache = os.path.join(local_app, "D3DSCache")
+            if os.path.exists(d3d_cache):
+                log("Purging DirectX shader cache (D3DSCache)...")
+                b, f, d = _safe_remove_dir_contents(d3d_cache)
+                total_bytes += b
+                total_files += f
+                total_dirs += d
+
+            user_wer = os.path.join(local_app, "Microsoft", "Windows", "WER")
+            if os.path.exists(user_wer):
+                log("Purging user Windows Error Reporting queues...")
+                b, f, d = _safe_remove_dir_contents(user_wer)
+                total_bytes += b
+                total_files += f
+                total_dirs += d
+
+        prog_data = os.environ.get("ProgramData", "C:\\ProgramData")
+        sys_wer = os.path.join(prog_data, "Microsoft", "Windows", "WER")
+        if os.path.exists(sys_wer):
+            log("Purging system Windows Error Reporting archive...")
+            b, f, d = _safe_remove_dir_contents(sys_wer)
+            total_bytes += b
+            total_files += f
+            total_dirs += d
+
         # Empty Recycle Bin
         log("Emptying Windows Recycle Bin across all mounted volumes...")
         try:

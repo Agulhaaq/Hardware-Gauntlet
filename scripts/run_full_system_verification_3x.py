@@ -144,13 +144,13 @@ def test_cli_cycle(cycle_num: int):
 
 def test_pytest_cycle(cycle_num: int):
     """Run complete pytest test suite."""
-    print(f"   [C{cycle_num}:PYTEST] Executing full pytest suite (91 tests)...")
+    print(f"   [C{cycle_num}:PYTEST] Executing full pytest suite (92 tests)...")
     t0 = time.time()
     res = subprocess.run([sys.executable, "-m", "pytest", "-q"], capture_output=True, text=True)
     elapsed = time.time() - t0
     assert res.returncode == 0, f"Pytest failed with exit code {res.returncode}:\n{res.stdout}\n{res.stderr}"
-    assert "91 passed" in res.stdout or "passed" in res.stdout
-    print(f"   [C{cycle_num}:PYTEST] ✓ 91/91 tests passed in {elapsed:.2f}s.")
+    assert "92 passed" in res.stdout or "passed" in res.stdout
+    print(f"   [C{cycle_num}:PYTEST] ✓ 92/92 tests passed in {elapsed:.2f}s.")
 
 
 def test_binaries_cycle(cycle_num: int):

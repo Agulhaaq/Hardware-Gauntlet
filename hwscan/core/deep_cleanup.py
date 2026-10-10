@@ -369,11 +369,16 @@ def run_deep_system_optimization(log_fn: Optional[Callable[[str], None]] = None)
     log(f"Summary: Component Store [OK] | Driver Store [OK] | Overhead [OK] | Dev Caches [{res_dev['freed_str']} freed]")
     log("=" * 60)
 
+    total_freed_bytes = res_dev.get("freed_bytes", 0) + res_comp.get("freed_bytes", 0)
+    total_freed_formatted = format_bytes(total_freed_bytes)
+
     return {
         "os": os_type,
         "component_store": res_comp,
         "driver_store": res_drv,
         "storage_overhead": res_ovh,
         "developer_caches": res_dev,
+        "total_freed_bytes": total_freed_bytes,
+        "total_freed_formatted": total_freed_formatted,
         "success": True
     }

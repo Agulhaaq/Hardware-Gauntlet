@@ -18,6 +18,8 @@ import math
 import subprocess
 import webbrowser
 import threading
+import inspect
+import psutil
 from typing import Optional, Dict, Any, Callable, List, Tuple
 
 from PIL import Image, ImageDraw, ImageTk
@@ -1362,7 +1364,8 @@ class HardwareGauntletGUI:
                     mem_bar_fill.place(x=0, y=0, relheight=1.0, relwidth=max(0.05, min(1.0, vm.percent / 100.0)))
                     btn_tmem_trim.set_state(tk.NORMAL)
                     btn_tmem_trim.set_text("TRIMMED")
-                    messagebox.showinfo("RAM Trim Complete", f"Working set memory trimmed successfully!\n\nFreed: {res.get('freed_str', 'OK')}\nActive Memory: {vm.percent}%")
+                    freed_amount = res.get("reclaimed_str") or res.get("freed_str") or "Working set trimmed"
+                    messagebox.showinfo("RAM Trim Complete", f"Working set memory trimmed successfully!\n\nFreed: {freed_amount}\nActive Memory: {vm.percent}%")
                     root.after(2000, lambda: btn_tmem_trim.set_text("TRIM RAM"))
                 root.after(0, done)
             threading.Thread(target=worker, daemon=True).start()
@@ -1808,9 +1811,18 @@ class HardwareGauntletGUI:
 
         # Mouse wheel support
         def _on_mousewheel(event):
-            canvas_tools.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            if active_tab_idx[0] != 7:
+                return
+            if hasattr(event, "delta") and event.delta:
+                canvas_tools.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            elif getattr(event, "num", None) == 4:
+                canvas_tools.yview_scroll(-1, "units")
+            elif getattr(event, "num", None) == 5:
+                canvas_tools.yview_scroll(1, "units")
 
-        canvas_tools.bind_all("<MouseWheel>", lambda e: _on_mousewheel(e) if active_tab_idx[0] == 7 else None)
+        canvas_tools.bind_all("<MouseWheel>", _on_mousewheel)
+        canvas_tools.bind_all("<Button-4>", _on_mousewheel)
+        canvas_tools.bind_all("<Button-5>", _on_mousewheel)
 
         canvas_tools.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll_tools.pack(side=tk.RIGHT, fill=tk.Y)
@@ -1919,7 +1931,14 @@ class HardwareGauntletGUI:
             def worker():
                 root.after(0, lambda: log_clean(f"Executing: {action_name}..."))
                 try:
-                    target_fn(log_fn=lambda m: root.after(0, lambda msg=m: log_clean(msg)))
+                    logger = lambda m: root.after(0, lambda msg=m: log_clean(msg))
+                    sig = inspect.signature(target_fn)
+                    if "log_fn" in sig.parameters or any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+                        res = target_fn(log_fn=logger)
+                    else:
+                        res = target_fn()
+                    if isinstance(res, dict) and res.get("success"):
+                        root.after(0, lambda: log_clean(f"✓ {action_name} executed successfully."))
                 except Exception as ex:
                     root.after(0, lambda: log_clean(f"Execution error: {ex}"))
 
@@ -2013,10 +2032,51 @@ class HardwareGauntletGUI:
         phys_clean_grid.pack(fill=tk.X, pady=(0, 4))
         themed_widgets["surface"].append(phys_clean_grid)
 
+        def log_fan_protocol(log_fn=None):
+            logger = log_fn or (lambda m: None)
+            p = get_fan_and_heatsink_cleaning_protocol()
+            logger(f"=== FAN & HEATSINK CLEANING PROTOCOL ({p['chassis']}) ===")
+            logger("REQUIRED TOOLS:")
+            for t in p["tools_required"]:
+                logger(f"  • {t}")
+            logger("\nCRITICAL SAFETY WARNINGS:")
+            for w in p["warnings"]:
+                logger(f"  [!] {w}")
+            logger("\nSTEP-BY-STEP PROCEDURE:")
+            for s in p["steps"]:
+                logger(f"  {s}")
+            return {"status": "Complete", "success": True}
+
+        def log_tim_advisor(log_fn=None):
+            logger = log_fn or (lambda m: None)
+            t = get_thermal_repasting_advisor()
+            logger(f"=== THERMAL REPASTING & TIM ADVISOR (Status: {t['urgency']}) ===")
+            logger(f"Recommended Interval: {t['interval_years']}")
+            logger("\nRECOMMENDED COMPOUNDS:")
+            for c in t["recommended_compounds"]:
+                logger(f"  • {c['name']} ({c['best_for']})")
+                logger(f"    Advantage: {c['advantage']}")
+            logger("\nAPPLICATION TECHNIQUE:")
+            for a in t["application_technique"]:
+                logger(f"  -> {a}")
+            logger("\nWARNINGS:")
+            for w in t["warnings"]:
+                logger(f"  [!] {w}")
+            return {"status": "Complete", "success": True}
+
+        def log_peripherals_guide(log_fn=None):
+            logger = log_fn or (lambda m: None)
+            g = get_peripherals_and_ports_hygiene_guide()
+            logger("=== SCREEN, PORT & PERIPHERAL HYGIENE GUIDE ===")
+            logger(f"Display Cleaning:\n  {g['display_cleaning']['technique']}\n  AVOID: {g['display_cleaning']['avoid']}")
+            logger(f"\nPort Cleaning:\n  {g['port_cleaning']['technique']}\n  AVOID: {g['port_cleaning']['avoid']}")
+            logger(f"\nKeyboard Care:\n  {g['keyboard_cleaning']['technique']}\n  AVOID: {g['keyboard_cleaning']['avoid']}")
+            return {"status": "Complete", "success": True}
+
         add_clean_tile(phys_clean_grid, "📋 System Plan", "Chassis-Tailored Checklist", "GENERATE PLAN", generate_physical_maintenance_guide, "Physical Maintenance Plan")
-        add_clean_tile(phys_clean_grid, "💨 Fan & Dust De-Clog", "Back-EMF Bearing Safety", "DUST PROTOCOL", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Fan & Dust Safety Protocol")
-        add_clean_tile(phys_clean_grid, "🧪 Thermal Repasting", "PTM7950 & TIM Advisor", "REPASTE GUIDE", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Thermal Repasting Advisor")
-        add_clean_tile(phys_clean_grid, "🖥️ Screen & Port Care", "USB-C Lint & AR Coatings", "PORT/SCREEN CARE", lambda log_fn=None: run_physical_maintenance_suite(log_fn), "Peripherals & Port Hygiene")
+        add_clean_tile(phys_clean_grid, "💨 Fan & Dust De-Clog", "Back-EMF Bearing Safety", "DUST PROTOCOL", log_fan_protocol, "Fan & Dust Safety Protocol")
+        add_clean_tile(phys_clean_grid, "🧪 Thermal Repasting", "PTM7950 & TIM Advisor", "REPASTE GUIDE", log_tim_advisor, "Thermal Repasting Advisor")
+        add_clean_tile(phys_clean_grid, "🖥️ Screen & Port Care", "USB-C Lint & AR Coatings", "PORT/SCREEN CARE", log_peripherals_guide, "Peripherals & Port Hygiene")
 
         lbl_tune_sub = tk.Label(cleanup_card, text="STARTUP HYGIENE, BACKGROUND SERVICES & LATENCY TUNER —", font=("Segoe UI", 8, "bold"))
         lbl_tune_sub.pack(anchor="w", pady=(6, 2))
@@ -2432,8 +2492,20 @@ class HardwareGauntletGUI:
             populate_tree(tree_sec, sec_rows)
 
         def run_background_scan():
-            rep = self.engine.run_full_scan()
-            root.after(0, update_ui_with_report, rep)
+            try:
+                rep = self.engine.run_full_scan()
+                root.after(0, update_ui_with_report, rep)
+            except Exception as ex:
+                def on_error():
+                    self._is_scanning = False
+                    btn_scan.set_state(tk.NORMAL)
+                    btn_scan.set_text("▶ RUN SCAN")
+                    btn_overview_scan.set_state(tk.NORMAL)
+                    btn_overview_scan.set_text("▶ RUN SCAN")
+                    dial_health.update_value("ERR", 0.0, "FAILED")
+                    lbl_subtitle.config(text=f"Scan error: {ex}")
+                    messagebox.showerror("Scan Failed", f"Hardware diagnostic scan encountered an error:\n{ex}")
+                root.after(0, on_error)
 
         def on_window_close():
             try:
