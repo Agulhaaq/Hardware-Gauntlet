@@ -8,6 +8,7 @@ from hwscan.reporters.console import ConsoleReporter
 from hwscan.reporters.json_reporter import JSONReporter
 from hwscan.reporters.markdown import MarkdownReporter
 from hwscan.reporters.html_reporter import HTMLReporter
+from hwscan.reporters.csv_reporter import CSVReporter
 
 
 def main():
@@ -64,6 +65,14 @@ def main():
         const="hardware-report.md",
         metavar="FILE",
         help="Export scan results as GitHub Markdown report"
+    )
+
+    parser.add_argument(
+        "--csv",
+        nargs="?",
+        const="hardware-report.csv",
+        metavar="FILE",
+        help="Export scan results to CSV format (default: hardware-report.csv, or '-' for stdout)"
     )
 
     parser.add_argument(
@@ -177,7 +186,7 @@ def main():
     if len(sys.argv) == 1 and not args.cli:
         should_launch_gui = True
 
-    if should_launch_gui and not (args.cli or args.json or args.html or args.markdown or args.health or args.full):
+    if should_launch_gui and not (args.cli or args.json or args.html or args.markdown or args.csv or args.health or args.full):
         from hwscan.gui import launch_gui
         engine_choice = args.gui if args.gui in ("auto", "webview", "tk") else "auto"
         launch_gui(prefer_engine=engine_choice)
@@ -217,8 +226,17 @@ def main():
         print(f"[✓] Markdown report generated: {args.markdown}")
         handled_output = True
 
+    if args.csv:
+        reporter = CSVReporter()
+        if args.csv == "-":
+            print(reporter.to_csv(report))
+        else:
+            reporter.write_file(report, args.csv)
+            print(f"[✓] CSV report saved to: {args.csv}")
+        handled_output = True
+
     # Terminal rendering
-    if not handled_output or (args.html and not args.json) or (args.markdown and not args.json) or args.cli or args.full:
+    if not handled_output or (args.html and not args.json and not args.csv) or (args.markdown and not args.json and not args.csv) or args.cli or args.full:
         reporter = ConsoleReporter()
         reporter.render(report, full=args.full)
 

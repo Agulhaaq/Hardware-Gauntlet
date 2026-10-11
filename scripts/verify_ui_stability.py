@@ -113,16 +113,25 @@ def run_stability_test_cycle(cycle_num: int):
                     print("    -> Modal closed cleanly")
 
                     # 6. Test on-demand hardware scan execution
-                    print(f" [Cycle {cycle_num}] 6. Running full hardware scan...")
-                    rep = gui.engine.run_full_scan()
+                    print(f" [Cycle {cycle_num}] 6. Running full hardware scan...", flush=True)
+                    scan_done = threading.Event()
+                    rep_holder = []
+                    def run_scan():
+                        rep_holder.append(gui.engine.run_full_scan())
+                        scan_done.set()
+                    scan_thread = threading.Thread(target=run_scan, daemon=True)
+                    scan_thread.start()
+                    while not scan_done.is_set():
+                        root_win.update()
+                        time.sleep(0.04)
+                    rep = rep_holder[0]
                     assert rep is not None, "Scan returned None"
                     assert rep.health_score > 0, "Invalid health score"
-                    print(f"    -> Scan complete! Health Score: {rep.health_score}/100")
+                    print(f"    -> Scan complete! Health Score: {rep.health_score}/100", flush=True)
 
                     # 7. Test RAM and SSD trimming handlers
                     if trim_btn and trim_btn.command:
-                        print(f" [Cycle {cycle_num}] 7. Testing TRIM RAM action trigger...")
-                        # Run non-blocking or verify command presence
+                        print(f" [Cycle {cycle_num}] 7. Testing TRIM RAM action trigger...", flush=True)
                         assert callable(trim_btn.command), "trim_btn command not callable"
 
                     print(f" [Cycle {cycle_num}] [✓] STABILITY CYCLE #{cycle_num} COMPLETED WITH ZERO ERRORS!")

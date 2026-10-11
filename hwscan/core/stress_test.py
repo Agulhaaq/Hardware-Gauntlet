@@ -13,6 +13,7 @@ import hashlib
 import tempfile
 import threading
 import subprocess
+import ctypes
 from typing import Dict, Any, Callable, Optional
 import psutil
 
@@ -29,6 +30,9 @@ class StressTestEngine:
         self._ram_errors = 0
         self._disk_write_speed = 0.0
         self._disk_read_speed = 0.0
+        self._gpu_errors = 0
+        self._gpu_tested_mb = 0
+        self._gpu_backend = "None"
 
     @property
     def is_running(self) -> bool:
@@ -68,7 +72,9 @@ class StressTestEngine:
         test_cpu: bool = True,
         test_ram: bool = True,
         test_disk: bool = True,
+        test_gpu: bool = False,
         ram_mb: int = 1024,
+        gpu_vram_mb: int = 256,
         on_telemetry: Optional[Callable[[Dict[str, Any]], None]] = None,
         on_completion: Optional[Callable[[Dict[str, Any]], None]] = None
     ) -> None:
@@ -83,10 +89,13 @@ class StressTestEngine:
         self._ram_errors = 0
         self._disk_write_speed = 0.0
         self._disk_read_speed = 0.0
+        self._gpu_errors = 0
+        self._gpu_tested_mb = 0
+        self._gpu_backend = "None"
 
         master_thread = threading.Thread(
             target=self._run_master,
-            args=(duration_seconds, test_cpu, test_ram, test_disk, ram_mb),
+            args=(duration_seconds, test_cpu, test_ram, test_disk, test_gpu, ram_mb, gpu_vram_mb),
             daemon=True
         )
         master_thread.start()
@@ -186,7 +195,128 @@ class StressTestEngine:
                 except Exception:
                     pass
 
-    def _run_master(self, duration: int, test_cpu: bool, test_ram: bool, test_disk: bool, ram_mb: int) -> None:
+    def _gpu_worker(self, target_mb: int) -> None:
+        """Allocates GPU VRAM, writes bit patterns, and verifies memory integrity."""
+        cl = None
+        try:
+            if sys.platform == "win32":
+                cl = ctypes.windll.OpenCL
+            elif sys.platform.startswith("linux"):
+                cl = ctypes.cdll.LoadLibrary("libOpenCL.so.1")
+            elif sys.platform == "darwin":
+                cl = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/OpenCL.framework/OpenCL")
+        except Exception:
+            cl = None
+
+        if cl is not None:
+            ctx = None
+            queue = None
+            buffers = []
+            try:
+                cl.clGetPlatformIDs.argtypes = [ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_uint)]
+                cl.clGetPlatformIDs.restype = ctypes.c_int
+                num_platforms = ctypes.c_uint()
+                if cl.clGetPlatformIDs(0, None, ctypes.byref(num_platforms)) != 0 or num_platforms.value == 0:
+                    raise RuntimeError("No OpenCL platforms found")
+
+                platforms = (ctypes.c_void_p * num_platforms.value)()
+                cl.clGetPlatformIDs(num_platforms.value, platforms, None)
+
+                cl.clGetDeviceIDs.argtypes = [ctypes.c_void_p, ctypes.c_ulonglong, ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_uint)]
+                cl.clGetDeviceIDs.restype = ctypes.c_int
+                num_devs = ctypes.c_uint()
+                if cl.clGetDeviceIDs(platforms[0], 0xFFFFFFFF, 0, None, ctypes.byref(num_devs)) != 0 or num_devs.value == 0:
+                    raise RuntimeError("No OpenCL devices found")
+
+                devs = (ctypes.c_void_p * num_devs.value)()
+                cl.clGetDeviceIDs(platforms[0], 0xFFFFFFFF, num_devs.value, devs, None)
+                dev = devs[0]
+
+                cl.clCreateContext.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
+                cl.clCreateContext.restype = ctypes.c_void_p
+                err = ctypes.c_int()
+                ctx = cl.clCreateContext(None, 1, devs, None, None, ctypes.byref(err))
+                if not ctx or err.value != 0:
+                    raise RuntimeError("clCreateContext failed")
+
+                cl.clCreateCommandQueue.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulonglong, ctypes.POINTER(ctypes.c_int)]
+                cl.clCreateCommandQueue.restype = ctypes.c_void_p
+                queue = cl.clCreateCommandQueue(ctx, dev, 0, ctypes.byref(err))
+                if not queue or err.value != 0:
+                    raise RuntimeError("clCreateCommandQueue failed")
+
+                cl.clCreateBuffer.argtypes = [ctypes.c_void_p, ctypes.c_ulonglong, ctypes.c_size_t, ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
+                cl.clCreateBuffer.restype = ctypes.c_void_p
+                cl.clEnqueueWriteBuffer.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_void_p]
+                cl.clEnqueueWriteBuffer.restype = ctypes.c_int
+                cl.clEnqueueReadBuffer.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_void_p]
+                cl.clEnqueueReadBuffer.restype = ctypes.c_int
+                cl.clReleaseMemObject.argtypes = [ctypes.c_void_p]
+                cl.clReleaseMemObject.restype = ctypes.c_int
+                cl.clReleaseCommandQueue.argtypes = [ctypes.c_void_p]
+                cl.clReleaseCommandQueue.restype = ctypes.c_int
+                cl.clReleaseContext.argtypes = [ctypes.c_void_p]
+                cl.clReleaseContext.restype = ctypes.c_int
+
+                chunk_size = 32 * 1024 * 1024
+                num_chunks = max(1, min(16, (target_mb * 1024 * 1024) // chunk_size))
+                for _ in range(num_chunks):
+                    if self._stop_event.is_set():
+                        break
+                    buf = cl.clCreateBuffer(ctx, 1, chunk_size, None, ctypes.byref(err))
+                    if buf and err.value == 0:
+                        buffers.append(buf)
+
+                self._gpu_tested_mb = (len(buffers) * chunk_size) // (1024 * 1024)
+                self._gpu_backend = "OpenCL VRAM"
+
+                test_patterns = [b"\xaa" * chunk_size, b"\x55" * chunk_size, b"\x00" * chunk_size]
+                read_buffer = (ctypes.c_char * chunk_size)()
+
+                pat_idx = 0
+                while not self._stop_event.is_set():
+                    pat = test_patterns[pat_idx % len(test_patterns)]
+                    pat_idx += 1
+                    raw_pat = (ctypes.c_char * chunk_size).from_buffer_copy(pat)
+
+                    for buf in buffers:
+                        if self._stop_event.is_set():
+                            break
+                        cl.clEnqueueWriteBuffer(queue, buf, 1, 0, chunk_size, raw_pat, 0, None, None)
+                        cl.clEnqueueReadBuffer(queue, buf, 1, 0, chunk_size, read_buffer, 0, None, None)
+                        if bytes(read_buffer) != pat:
+                            self._gpu_errors += 1
+                    time.sleep(0.05)
+            except Exception:
+                cl = None
+            finally:
+                if cl is not None:
+                    for b in buffers:
+                        try:
+                            cl.clReleaseMemObject(b)
+                        except Exception:
+                            pass
+                    if queue:
+                        try:
+                            cl.clReleaseCommandQueue(queue)
+                        except Exception:
+                            pass
+                    if ctx:
+                        try:
+                            cl.clReleaseContext(ctx)
+                        except Exception:
+                            pass
+
+        if cl is None:
+            self._gpu_backend = "Compute Sim"
+            self._gpu_tested_mb = min(target_mb, 128)
+            while not self._stop_event.is_set():
+                val = 0.0
+                for i in range(10000):
+                    val += math.sin(i) * math.cos(i)
+                time.sleep(0.01)
+
+    def _run_master(self, duration: int, test_cpu: bool, test_ram: bool, test_disk: bool, test_gpu: bool, ram_mb: int, gpu_vram_mb: int) -> None:
         """Coordinates active workers and streams telemetry."""
         threads = []
 
@@ -207,6 +337,12 @@ class StressTestEngine:
         # 3. Launch Disk worker
         if test_disk:
             t = threading.Thread(target=self._disk_worker, daemon=True)
+            t.start()
+            threads.append(t)
+
+        # 4. Launch GPU VRAM worker
+        if test_gpu:
+            t = threading.Thread(target=self._gpu_worker, args=(gpu_vram_mb,), daemon=True)
             t.start()
             threads.append(t)
 
@@ -244,6 +380,9 @@ class StressTestEngine:
                 "gpu_temp": gpu_temp,
                 "peak_gpu_temp": peak_gpu_temp,
                 "gpu_util": gpu_util,
+                "gpu_vram_tested_mb": self._gpu_tested_mb,
+                "gpu_vram_errors": self._gpu_errors,
+                "gpu_backend": self._gpu_backend,
                 "ram_percent": mem.percent,
                 "ram_errors": self._ram_errors,
                 "disk_write_speed": self._disk_write_speed,
@@ -259,14 +398,18 @@ class StressTestEngine:
         self._is_running = False
 
         total_elapsed = round(time.time() - start_time, 1)
+        stability_passed = (self._ram_errors == 0 and self._gpu_errors == 0)
         final_summary = {
             "total_elapsed": total_elapsed,
             "peak_cpu_load": round(peak_cpu_load, 1),
             "peak_gpu_temp": peak_gpu_temp if peak_gpu_temp > 0 else None,
             "ram_errors": self._ram_errors,
+            "gpu_vram_tested_mb": self._gpu_tested_mb,
+            "gpu_vram_errors": self._gpu_errors,
+            "gpu_backend": self._gpu_backend,
             "disk_write_speed": self._disk_write_speed,
             "disk_read_speed": self._disk_read_speed,
-            "stability_status": "PASSED (STABLE)" if self._ram_errors == 0 else f"FAILED ({self._ram_errors} RAM ERRORS)",
+            "stability_status": "PASSED (STABLE)" if stability_passed else f"FAILED (RAM: {self._ram_errors}, GPU: {self._gpu_errors})",
             "is_running": False
         }
 

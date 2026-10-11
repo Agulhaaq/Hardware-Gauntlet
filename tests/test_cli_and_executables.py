@@ -42,6 +42,18 @@ def test_cli_json_stdout():
     assert "health_score" in data
 
 
+def test_cli_csv_stdout():
+    result = subprocess.run(
+        [sys.executable, "-m", "hwscan.cli", "--csv", "-"],
+        capture_output=True,
+        text=True
+    )
+    assert result.returncode == 0
+    assert "Category,Subsystem,Property,Value,Unit_or_Details" in result.stdout
+    assert "Operating System" in result.stdout
+    assert "Processor" in result.stdout
+
+
 def test_dist_executables_exist():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dist_dir = os.path.join(base_dir, "dist")

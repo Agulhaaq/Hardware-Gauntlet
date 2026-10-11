@@ -68,6 +68,7 @@ hwscan
 - **🔥 Hardware Stress & Thermal Stability Engine**:
   - **Multi-Core CPU Torture**: Full load on all logical cores with floating-point calculations and SHA-256 iterations.
   - **RAM Bit-Flip Integrity**: Allocates test pattern buffers (`0xAA`, `0x55`, `0x00`, `0xFF`) and verifies against memory cell decay and bit corruption.
+  - **GPU VRAM Torture Subsystem**: OpenCL physical video RAM allocation, bit pattern stress (`0xAA`, `0x55`), and memory bandwidth integrity testing.
   - **Disk Sequential I/O**: Measures sustained sequential Write and Read speeds in MB/s.
   - **Thermal & Throttling Monitor**: Live GPU temperatures (`nvidia-smi`), clock frequency throttling, and stability verdicts (`PASSED` vs `FAILED`).
   - **Windows Benchmark Shortcuts**: 1-click execution for `mdsched.exe` (Windows Memory Diagnostic), `perfmon.exe /report`, `winsat.exe`, and `dxdiag.exe`.
@@ -101,11 +102,13 @@ hwscan
 - **🎨 QK Brand Identity & Dual Theme Support**:
   - Stark brutalist monochrome cyber aesthetic with razor-sharp contrast.
   - Instant toggling between `🌙 Dark Mode` (obsidian void `#08080a`, slate `#25252e`, pure white `#ffffff`) and `☀️ Light Mode` (paper `#f5f5f7`, pure black `#09090b`).
+  - Persistent user preferences (Theme & active tab saved across sessions with zero registry bloat).
 - **📄 Multi-Format Reporting**:
   - Interactive styled terminal dashboard (`rich` + auto ASCII fallback)
   - Standalone single-file HTML audit report (interactive with print/PDF export and embedded logo)
-  - Machine-readable JSON
-  - GitHub-flavored Markdown
+  - Tabular CSV diagnostic report (`--csv`) for spreadsheets & IT asset fleet management
+  - Machine-readable JSON (`--json`)
+  - GitHub-flavored Markdown (`--markdown`)
 - **🌐 Built-in Web Server & Download Portal**: Run `hwscan --web` to launch a browser dashboard that detects client OS and serves custom downloads.
 
 ---
@@ -170,9 +173,10 @@ Hardware-Gauntlet/
 │   ├── core/
 │   │   ├── models.py         # Hardware dataclasses & JSON serializers
 │   │   ├── system_info.py    # Master engine & health scoring
-│   │   ├── stress_test.py    # Multi-core CPU, RAM pattern, and disk throughput engine
+│   │   ├── stress_test.py    # Multi-core CPU, RAM pattern, GPU VRAM, and disk throughput engine
 │   │   ├── instance_guard.py # Single-instance mutex and foreground window manager
 │   │   ├── update_channel.py # In-place update channel & hot-patch engine
+│   │   ├── user_settings.py  # Portable persistent preferences engine
 │   │   ├── cleanup.py        # Basic temp, memory, and DNS resolver cleanup
 │   │   ├── deep_cleanup.py   # WinSxS, driver store, and developer cache hygiene
 │   │   ├── hardware_health.py # SSD TBW endurance & thermal stress analytics
@@ -195,7 +199,8 @@ Hardware-Gauntlet/
 │   │   ├── console.py        # Rich terminal UI & ASCII fallback
 │   │   ├── json_reporter.py  # Structured JSON exporter
 │   │   ├── markdown.py       # Markdown exporter
-│   │   └── html_reporter.py  # Standalone interactive HTML report
+│   │   ├── html_reporter.py  # Standalone interactive HTML report
+│   │   └── csv_reporter.py   # Tabular CSV diagnostic exporter
 │   └── web/
 │       └── server.py         # HTTP server & Multi-OS download portal
 ├── distribution/
@@ -209,7 +214,7 @@ Hardware-Gauntlet/
 │   ├── verify_ui_stability.py        # 3-cycle automated live UI stability verification
 │   ├── verify_single_instance_3x.py  # 3-cycle single-instance mutex verification harness
 │   └── run_full_system_verification_3x.py # 3-cycle full-spectrum system verification runner
-├── tests/                            # 92 comprehensive automated pytest tests
+├── tests/                            # 98 comprehensive automated pytest tests
 ├── distribution/workflows/
 │   └── build-and-release.yml         # Multi-OS CI/CD build matrix and GitHub Releases template
 ├── HardwareGauntlet.spec     # Windows PyInstaller UPX spec

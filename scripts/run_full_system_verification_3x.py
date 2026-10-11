@@ -10,6 +10,7 @@ import sys
 import time
 import subprocess
 import json
+import threading
 import tkinter as tk
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -93,7 +94,17 @@ def test_ui_cycle(cycle_num: int):
                     root_win.update()
 
                     # 4. Trigger scan
-                    rep = gui.engine.run_full_scan()
+                    scan_done = threading.Event()
+                    rep_holder = []
+                    def run_scan():
+                        rep_holder.append(gui.engine.run_full_scan())
+                        scan_done.set()
+                    scan_thread = threading.Thread(target=run_scan, daemon=True)
+                    scan_thread.start()
+                    while not scan_done.is_set():
+                        root_win.update()
+                        time.sleep(0.04)
+                    rep = rep_holder[0]
                     assert rep is not None and rep.health_score > 0
 
                 except Exception as e:
@@ -144,13 +155,13 @@ def test_cli_cycle(cycle_num: int):
 
 def test_pytest_cycle(cycle_num: int):
     """Run complete pytest test suite."""
-    print(f"   [C{cycle_num}:PYTEST] Executing full pytest suite (92 tests)...")
+    print(f"   [C{cycle_num}:PYTEST] Executing full pytest suite (98 tests)...", flush=True)
     t0 = time.time()
     res = subprocess.run([sys.executable, "-m", "pytest", "-q"], capture_output=True, text=True)
     elapsed = time.time() - t0
     assert res.returncode == 0, f"Pytest failed with exit code {res.returncode}:\n{res.stdout}\n{res.stderr}"
-    assert "92 passed" in res.stdout or "passed" in res.stdout
-    print(f"   [C{cycle_num}:PYTEST] ✓ 92/92 tests passed in {elapsed:.2f}s.")
+    assert "98 passed" in res.stdout or "passed" in res.stdout
+    print(f"   [C{cycle_num}:PYTEST] ✓ 98/98 tests passed in {elapsed:.2f}s.", flush=True)
 
 
 def test_binaries_cycle(cycle_num: int):

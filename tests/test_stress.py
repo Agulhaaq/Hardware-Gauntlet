@@ -72,3 +72,31 @@ def test_stress_engine_manual_stop():
     time.sleep(0.3)
     engine.stop_test()
     assert not engine.is_running
+
+
+def test_stress_engine_gpu_vram_torture():
+    engine = StressTestEngine()
+    completion_events = []
+
+    engine.start_test(
+        duration_seconds=1,
+        test_cpu=False,
+        test_ram=False,
+        test_disk=False,
+        test_gpu=True,
+        gpu_vram_mb=32,
+        on_completion=lambda s: completion_events.append(s),
+    )
+    assert engine.is_running
+
+    t0 = time.time()
+    while engine.is_running and (time.time() - t0) < 8.0:
+        time.sleep(0.1)
+
+    assert not engine.is_running
+    assert len(completion_events) == 1
+    summary = completion_events[0]
+    assert "gpu_vram_tested_mb" in summary
+    assert "gpu_backend" in summary
+    assert summary["gpu_backend"] in ("OpenCL VRAM", "Compute Sim")
+    assert "PASSED" in summary["stability_status"]

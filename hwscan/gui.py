@@ -27,6 +27,8 @@ from PIL import Image, ImageDraw, ImageTk
 from hwscan.core.system_info import HardwareScannerEngine
 from hwscan.reporters.html_reporter import HTMLReporter
 from hwscan.reporters.json_reporter import JSONReporter
+from hwscan.reporters.csv_reporter import CSVReporter
+from hwscan.core.user_settings import get_setting, set_setting
 from hwscan.core.utils import format_bytes, format_hz
 from hwscan.core.stress_test import StressTestEngine
 from hwscan.core.instance_guard import (
@@ -839,8 +841,9 @@ class HardwareGauntletGUI:
         self.stress_engine = StressTestEngine()
         self.html_reporter = HTMLReporter()
         self.json_reporter = JSONReporter()
+        self.csv_reporter = CSVReporter()
         self.current_report = None
-        self.current_theme = "dark"
+        self.current_theme = get_setting("theme", "dark")
         self._is_scanning = False
 
     def run(self, prefer_engine: str = "auto") -> None:
@@ -979,8 +982,22 @@ class HardwareGauntletGUI:
                 self.json_reporter.write_file(self.current_report, f)
                 messagebox.showinfo("JSON Saved", f"Machine-readable JSON report saved to:\n{f}")
 
+        def do_export_csv():
+            if not self.current_report:
+                messagebox.showinfo("Scan Required", "Please run a hardware scan first before exporting CSV data.")
+                return
+            f = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV Diagnostic Report", "*.csv")],
+                initialfile=f"hardware-report-{self.current_report.system.hostname}.csv"
+            )
+            if f:
+                self.csv_reporter.write_file(self.current_report, f)
+                messagebox.showinfo("CSV Saved", f"Tabular CSV report saved to:\n{f}")
+
         def toggle_theme():
             self.current_theme = "light" if self.current_theme == "dark" else "dark"
+            set_setting("theme", self.current_theme)
             apply_current_theme()
 
         def launch_os_tool(tool_cmd):
@@ -1157,6 +1174,10 @@ class HardwareGauntletGUI:
         btn_json.pack(side=tk.LEFT, padx=3)
         themed_widgets["pill_buttons"].append(btn_json)
 
+        btn_csv = PillButton(btn_frame, text="📊 CSV", command=do_export_csv, width=78, height=32, is_primary=False)
+        btn_csv.pack(side=tk.LEFT, padx=3)
+        themed_widgets["pill_buttons"].append(btn_csv)
+
         # -------------------------------------------------------------
         # Bubble Capsule Tab Navigation (Pure 100Days Pill Bar)
         # -------------------------------------------------------------
@@ -1185,6 +1206,7 @@ class HardwareGauntletGUI:
 
         def switch_tab(target_idx: int):
             active_tab_idx[0] = target_idx
+            set_setting("active_tab", target_idx)
             for i, page in enumerate(tab_pages):
                 if i == target_idx:
                     page.pack(fill=tk.BOTH, expand=True)
@@ -1225,8 +1247,12 @@ class HardwareGauntletGUI:
         tab_security = tab_pages[6]
         tab_tools = tab_pages[7]
 
-        # Initially display overview
-        tab_overview.pack(fill=tk.BOTH, expand=True)
+        # Restore saved active tab or default to overview
+        saved_tab_idx = get_setting("active_tab", 0)
+        if isinstance(saved_tab_idx, int) and 0 <= saved_tab_idx < len(tab_pages):
+            switch_tab(saved_tab_idx)
+        else:
+            tab_overview.pack(fill=tk.BOTH, expand=True)
 
         # -------------------------------------------------------------
         # Tab 1: Concept 3 — Bento-Box Modular Studio Architecture
@@ -1302,8 +1328,12 @@ class HardwareGauntletGUI:
         themed_widgets["pill_buttons"].append(btn_overview_scan)
 
         btn_overview_export = PillButton(hero_btn_row, text="📄 REPORT", command=do_export_html, width=105, height=30, is_primary=False)
-        btn_overview_export.pack(side=tk.LEFT)
+        btn_overview_export.pack(side=tk.LEFT, padx=(0, 6))
         themed_widgets["pill_buttons"].append(btn_overview_export)
+
+        btn_overview_csv = PillButton(hero_btn_row, text="📊 CSV", command=do_export_csv, width=76, height=30, is_primary=False)
+        btn_overview_csv.pack(side=tk.LEFT)
+        themed_widgets["pill_buttons"].append(btn_overview_csv)
 
         # Footer Metrics Row inside Hero Block
         hero_footer = tk.Frame(bento_hero)
@@ -1538,8 +1568,12 @@ class HardwareGauntletGUI:
         themed_widgets["capsule_strips"].append(strip_ram)
 
         strip_disk = BubbleCapsuleStrip(card_controls, icon="💽", title="Disk Sequential I/O", desc="Sequential write and read speed benchmark", initial=True)
-        strip_disk.pack(fill=tk.X, pady=(0, 10))
+        strip_disk.pack(fill=tk.X, pady=(0, 6))
         themed_widgets["capsule_strips"].append(strip_disk)
+
+        strip_gpu = BubbleCapsuleStrip(card_controls, icon="🎮", title="GPU VRAM Torture", desc="OpenCL hardware memory stress & pattern verify", initial=get_setting("stress_gpu", False))
+        strip_gpu.pack(fill=tk.X, pady=(0, 10))
+        themed_widgets["capsule_strips"].append(strip_gpu)
 
         # Duration & Pill Execution buttons
         stress_act_row = tk.Frame(card_controls)
@@ -1662,7 +1696,10 @@ class HardwareGauntletGUI:
                 else:
                     dial_thermal.update_value("NORM", progress, "PASS")
 
-                lbl_stress_status.config(text=f"Status: Stress testing in progress... Elapsed: {t.get('elapsed', 0)}s / {t.get('duration', 30)}s ({progress:.0f}%)")
+                extra_stat = ""
+                if t.get("gpu_vram_tested_mb", 0) > 0:
+                    extra_stat = f" • VRAM: {t.get('gpu_vram_tested_mb')}MB ({t.get('gpu_backend')})"
+                lbl_stress_status.config(text=f"Status: Stress testing in progress... Elapsed: {t.get('elapsed', 0)}s / {t.get('duration', 30)}s ({progress:.0f}%){extra_stat}")
             root.after(0, update)
 
         def on_stress_complete(summary: Dict[str, Any]):
@@ -1677,6 +1714,8 @@ class HardwareGauntletGUI:
                 log_console(f"Torture benchmark finished. Verdict: {verdict}")
                 log_console(f"Peak CPU Load: {summary.get('peak_cpu_load', 0)}% | Peak GPU Temp: {summary.get('peak_gpu_temp', 'N/A')} °C")
                 log_console(f"RAM Integrity Errors: {summary.get('ram_errors', 0)}")
+                if summary.get("gpu_vram_tested_mb", 0) > 0:
+                    log_console(f"GPU VRAM Tortured: {summary.get('gpu_vram_tested_mb')} MB ({summary.get('gpu_backend')}) | Errors: {summary.get('gpu_vram_errors', 0)}")
                 if summary.get("disk_write_speed", 0) > 0:
                     log_console(f"Disk Sequential Write: {summary.get('disk_write_speed')} MB/s | Read: {summary.get('disk_read_speed')} MB/s")
                 messagebox.showinfo("Stress Test Complete", f"Hardware Torture Benchmark Finished!\n\nVerdict: {verdict}\nPeak CPU Load: {summary.get('peak_cpu_load', 0)}%\nPeak GPU Temp: {summary.get('peak_gpu_temp', 'N/A')} °C\nRAM Bit Errors: {summary.get('ram_errors', 0)}")
@@ -1689,23 +1728,28 @@ class HardwareGauntletGUI:
             c_on = strip_cpu.is_on
             r_on = strip_ram.is_on
             d_on = strip_disk.is_on
+            g_on = strip_gpu.is_on
 
-            if not (c_on or r_on or d_on):
+            if not (c_on or r_on or d_on or g_on):
                 messagebox.showwarning("Selection Required", "Please select at least one subsystem to stress test.")
                 return
+
+            set_setting("stress_gpu", g_on)
 
             btn_start_stress.set_state(tk.DISABLED)
             btn_stop_stress.set_state(tk.NORMAL)
             stress_progress["value"] = 0
             lbl_stress_status.config(text="Status: Launching hardware stress workers...")
 
-            log_console(f"Starting {dur}s stress test [CPU: {c_on}, RAM: {r_on}, Disk: {d_on}]...")
+            log_console(f"Starting {dur}s stress test [CPU: {c_on}, RAM: {r_on}, Disk: {d_on}, GPU: {g_on}]...")
             self.stress_engine.start_test(
                 duration_seconds=dur,
                 test_cpu=c_on,
                 test_ram=r_on,
                 test_disk=d_on,
+                test_gpu=g_on,
                 ram_mb=1024,
+                gpu_vram_mb=256,
                 on_telemetry=on_stress_telemetry,
                 on_completion=on_stress_complete
             )

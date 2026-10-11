@@ -5,7 +5,7 @@ import os
 import tempfile
 import pytest
 from hwscan.core.system_info import HardwareScannerEngine
-from hwscan.reporters import JSONReporter, MarkdownReporter, HTMLReporter, ConsoleReporter
+from hwscan.reporters import JSONReporter, MarkdownReporter, HTMLReporter, ConsoleReporter, CSVReporter
 
 
 @pytest.fixture(scope="module")
@@ -74,3 +74,22 @@ def test_console_reporter(sample_report):
     # Test summary and full renders do not raise
     reporter.render(sample_report, full=False)
     reporter.render(sample_report, full=True)
+
+
+def test_csv_reporter(sample_report):
+    reporter = CSVReporter()
+    csv_str = reporter.to_csv(sample_report)
+    assert isinstance(csv_str, str)
+    assert "Category,Subsystem,Property,Value,Unit_or_Details" in csv_str
+    assert "Operating System" in csv_str
+    assert "Processor" in csv_str
+    assert "Memory" in csv_str
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = os.path.join(tmpdir, "report.csv")
+        reporter.write_file(sample_report, out_path)
+        assert os.path.exists(out_path)
+        with open(out_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            assert "Category,Subsystem,Property,Value,Unit_or_Details" in content
+            assert str(sample_report.health_score) in content
