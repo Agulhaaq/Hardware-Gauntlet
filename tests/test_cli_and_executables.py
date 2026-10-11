@@ -54,6 +54,19 @@ def test_cli_csv_stdout():
     assert "Processor" in result.stdout
 
 
+def test_cli_bundle_and_ephemeral(tmp_path):
+    bundle_target = str(tmp_path / "cli_test_bundle.zip")
+    result = subprocess.run(
+        [sys.executable, "-m", "hwscan.cli", "--ephemeral", "--bundle", bundle_target],
+        capture_output=True,
+        text=True
+    )
+    assert result.returncode == 0
+    assert "Complete diagnostic bundle archive generated:" in result.stdout
+    assert os.path.exists(bundle_target)
+    assert os.path.getsize(bundle_target) > 0
+
+
 def test_dist_executables_exist():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dist_dir = os.path.join(base_dir, "dist")

@@ -26,9 +26,11 @@ class TestScanners(unittest.TestCase):
         scanner = CPUScanner()
         info = scanner.scan()
         self.assertIsNotNone(info.model)
+        self.assertNotEqual(info.model, "")
         self.assertGreater(info.logical_cores, 0)
         self.assertGreater(info.physical_cores, 0)
         self.assertIsInstance(info.features, list)
+        self.assertGreater(info.base_clock_mhz, 0)
 
     def test_memory_scanner(self):
         scanner = MemoryScanner()
@@ -45,6 +47,10 @@ class TestScanners(unittest.TestCase):
         self.assertIsInstance(info.physical_disks, list)
         # On any normal system at least one partition exists
         self.assertGreater(len(info.partitions), 0)
+        if info.physical_disks:
+            d = info.physical_disks[0]
+            self.assertIsNotNone(d.model)
+            self.assertIsNotNone(d.smart_status)
 
     def test_gpu_scanner(self):
         scanner = GPUScanner()

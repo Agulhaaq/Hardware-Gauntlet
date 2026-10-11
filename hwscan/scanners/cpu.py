@@ -45,6 +45,36 @@ class CPUScanner(BaseScanner):
         return info
 
     def _scan_windows(self, info: CPUInfo) -> None:
+        # Fast-path Windows Registry probe (<0.5ms)
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
+                name, _ = winreg.QueryValueEx(key, "ProcessorNameString")
+                if name and isinstance(name, str) and name.strip():
+                    info.model = name.strip()
+                try:
+                    mhz, _ = winreg.QueryValueEx(key, "~MHz")
+                    if mhz and isinstance(mhz, (int, float)) and mhz > 0:
+                        info.base_clock_mhz = float(mhz)
+                        if not info.max_clock_mhz:
+                            info.max_clock_mhz = float(mhz)
+                except Exception:
+                    pass
+                try:
+                    vendor, _ = winreg.QueryValueEx(key, "VendorIdentifier")
+                    if vendor and isinstance(vendor, str) and vendor.strip():
+                        info.vendor = vendor.strip()
+                except Exception:
+                    pass
+                try:
+                    ident, _ = winreg.QueryValueEx(key, "Identifier")
+                    if ident and not info.architecture:
+                        info.architecture = str(ident)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         try:
             raw_json = run_powershell_json(
                 "Get-CimInstance Win32_Processor | Select-Object Name, Manufacturer, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed, L2CacheSize, L3CacheSize"
@@ -54,8 +84,12 @@ class CPUScanner(BaseScanner):
                 if isinstance(data, list) and len(data) > 0:
                     data = data[0]
 
-                info.model = data.get("Name", "").strip() or platform.processor()
-                info.vendor = data.get("Manufacturer", "").strip()
+                wmi_name = data.get("Name", "").strip()
+                if wmi_name:
+                    info.model = wmi_name
+                wmi_vendor = data.get("Manufacturer", "").strip()
+                if wmi_vendor:
+                    info.vendor = wmi_vendor
                 if not info.physical_cores and data.get("NumberOfCores"):
                     info.physical_cores = int(data.get("NumberOfCores"))
                 if not info.logical_cores and data.get("NumberOfLogicalProcessors"):
@@ -64,7 +98,8 @@ class CPUScanner(BaseScanner):
                 speed = data.get("MaxClockSpeed")
                 if speed:
                     info.max_clock_mhz = float(speed)
-                    info.base_clock_mhz = float(speed)
+                    if not info.base_clock_mhz:
+                        info.base_clock_mhz = float(speed)
 
                 l2 = data.get("L2CacheSize")
                 if l2:

@@ -134,6 +134,10 @@ class PhysicalDisk:
     size_formatted: str = ""
     serial_number: str = "Unknown"
     smart_status: str = "Healthy"
+    wear_percent: Optional[float] = None
+    tbw_written_tb: Optional[float] = None
+    power_on_hours: Optional[int] = None
+    temperature_c: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

@@ -28,6 +28,7 @@ from hwscan.core.system_info import HardwareScannerEngine
 from hwscan.reporters.html_reporter import HTMLReporter
 from hwscan.reporters.json_reporter import JSONReporter
 from hwscan.reporters.csv_reporter import CSVReporter
+from hwscan.reporters.bundle import DiagnosticBundleReporter
 from hwscan.core.user_settings import get_setting, set_setting
 from hwscan.core.utils import format_bytes, format_hz
 from hwscan.core.stress_test import StressTestEngine
@@ -833,6 +834,25 @@ class BubbleCapsuleStrip(tk.Canvas):
             self.create_image(int(round(self._current_knob_x)), self.track_y + 3, anchor="nw", image=knob_img)
 
 
+def enable_high_dpi_awareness() -> None:
+    """Enable Per-Monitor v2 DPI awareness on Windows systems for razor-sharp rendering."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            # Per-Monitor V2 (Windows 10 Creators Update 1703+)
+            ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+        except Exception:
+            try:
+                # Windows 8.1 / 10
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            except Exception:
+                try:
+                    # Windows Vista / 7
+                    ctypes.windll.user32.SetProcessDPIAware()
+                except Exception:
+                    pass
+
+
 class HardwareGauntletGUI:
     """Orchestrates modern desktop application with 100Days design aesthetic."""
 
@@ -842,6 +862,7 @@ class HardwareGauntletGUI:
         self.html_reporter = HTMLReporter()
         self.json_reporter = JSONReporter()
         self.csv_reporter = CSVReporter()
+        self.bundle_reporter = DiagnosticBundleReporter()
         self.current_report = None
         self.current_theme = get_setting("theme", "dark")
         self._is_scanning = False
@@ -856,9 +877,18 @@ class HardwareGauntletGUI:
 
     def _run_tkinter(self) -> None:
         """Render native Tkinter GUI with duotone design, radial dials, and pill buttons."""
+        enable_high_dpi_awareness()
         root = tk.Tk()
         root.title(WINDOW_TITLE)
-        root.geometry("1180x820")
+
+        saved_geom = get_setting("window_geometry", "1180x820")
+        if not isinstance(saved_geom, str) or "x" not in saved_geom:
+            saved_geom = "1180x820"
+        try:
+            root.geometry(saved_geom)
+        except Exception:
+            root.geometry("1180x820")
+
         root.minsize(980, 700)
         root.update_idletasks()
 
@@ -994,6 +1024,19 @@ class HardwareGauntletGUI:
             if f:
                 self.csv_reporter.write_file(self.current_report, f)
                 messagebox.showinfo("CSV Saved", f"Tabular CSV report saved to:\n{f}")
+
+        def do_export_bundle():
+            if not self.current_report:
+                messagebox.showinfo("Scan Required", "Please run a hardware scan first before exporting a diagnostic bundle.")
+                return
+            f = filedialog.asksaveasfilename(
+                defaultextension=".zip",
+                filetypes=[("Diagnostic Bundle ZIP", "*.zip")],
+                initialfile=f"hardware-bundle-{self.current_report.system.hostname}.zip"
+            )
+            if f:
+                out_zip = self.bundle_reporter.create_bundle(self.current_report, f)
+                messagebox.showinfo("Bundle Exported", f"Diagnostic bundle generated successfully to:\n{out_zip}\n\nContains JSON, HTML, CSV, TXT summary, and environment metadata.")
 
         def toggle_theme():
             self.current_theme = "light" if self.current_theme == "dark" else "dark"
@@ -1178,6 +1221,10 @@ class HardwareGauntletGUI:
         btn_csv.pack(side=tk.LEFT, padx=3)
         themed_widgets["pill_buttons"].append(btn_csv)
 
+        btn_bundle = PillButton(btn_frame, text="📦 BUNDLE", command=do_export_bundle, width=88, height=32, is_primary=False)
+        btn_bundle.pack(side=tk.LEFT, padx=3)
+        themed_widgets["pill_buttons"].append(btn_bundle)
+
         # -------------------------------------------------------------
         # Bubble Capsule Tab Navigation (Pure 100Days Pill Bar)
         # -------------------------------------------------------------
@@ -1200,13 +1247,17 @@ class HardwareGauntletGUI:
             ("🛠 UTILITIES", 108),
         ]
 
+        tab_names = ["overview", "stress", "cpu", "memory", "gpu", "storage", "security", "utilities"]
         tab_pages = []
         tab_pills = []
         active_tab_idx = [0]
 
         def switch_tab(target_idx: int):
+            if not (0 <= target_idx < len(tab_pages)):
+                target_idx = 0
             active_tab_idx[0] = target_idx
-            set_setting("active_tab", target_idx)
+            tab_val = tab_names[target_idx] if target_idx < len(tab_names) else target_idx
+            set_setting("active_tab", tab_val)
             for i, page in enumerate(tab_pages):
                 if i == target_idx:
                     page.pack(fill=tk.BOTH, expand=True)
@@ -1248,11 +1299,16 @@ class HardwareGauntletGUI:
         tab_tools = tab_pages[7]
 
         # Restore saved active tab or default to overview
-        saved_tab_idx = get_setting("active_tab", 0)
-        if isinstance(saved_tab_idx, int) and 0 <= saved_tab_idx < len(tab_pages):
-            switch_tab(saved_tab_idx)
-        else:
-            tab_overview.pack(fill=tk.BOTH, expand=True)
+        saved_tab_raw = get_setting("active_tab", "overview")
+        target_restore = 0
+        if isinstance(saved_tab_raw, str):
+            raw_clean = saved_tab_raw.strip().lower()
+            if raw_clean in tab_names:
+                target_restore = tab_names.index(raw_clean)
+        elif isinstance(saved_tab_raw, int) and 0 <= saved_tab_raw < len(tab_pages):
+            target_restore = saved_tab_raw
+
+        switch_tab(target_restore)
 
         # -------------------------------------------------------------
         # Tab 1: Concept 3 — Bento-Box Modular Studio Architecture
@@ -2518,7 +2574,13 @@ class HardwareGauntletGUI:
             # Storage
             storage_rows = []
             for d in report.storage.physical_disks:
-                storage_rows.append((f"[Physical] {d.model}", d.media_type, d.size_formatted, d.interface_type, d.smart_status, "Physical Disk"))
+                status_parts = [d.smart_status]
+                if d.wear_percent is not None:
+                    status_parts.append(f"Wear: {d.wear_percent}%")
+                if d.temperature_c is not None:
+                    status_parts.append(f"{d.temperature_c}°C")
+                health_display = " • ".join(status_parts)
+                storage_rows.append((f"[Physical] {d.model}", d.media_type, d.size_formatted, d.interface_type, health_display, "Physical Disk"))
             for p in report.storage.partitions:
                 storage_rows.append((p.mountpoint, p.fstype, p.total_formatted, p.used_formatted, p.free_formatted, f"{p.percent}%"))
             populate_tree(tree_storage, storage_rows)
@@ -2554,6 +2616,10 @@ class HardwareGauntletGUI:
 
         def on_window_close():
             try:
+                set_setting("window_geometry", root.geometry())
+            except Exception:
+                pass
+            try:
                 self.stress_engine.stop_test()
             except Exception:
                 pass
@@ -2568,6 +2634,51 @@ class HardwareGauntletGUI:
             os._exit(0)
 
         root.protocol("WM_DELETE_WINDOW", on_window_close)
+
+        # Double-click copy-to-clipboard on specification Treeviews
+        def on_tree_double_click(event):
+            widget = event.widget
+            if not isinstance(widget, ttk.Treeview):
+                return
+            item_id = widget.identify_row(event.y)
+            if not item_id:
+                return
+            vals = widget.item(item_id, "values")
+            if not vals:
+                return
+            if len(vals) == 2:
+                copied_text = str(vals[1])
+            else:
+                copied_text = " | ".join(str(v) for v in vals)
+            root.clipboard_clear()
+            root.clipboard_append(copied_text)
+            orig_txt = lbl_subtitle.cget("text")
+            lbl_subtitle.config(text=f"📋 Copied to clipboard: {copied_text[:60]}")
+            root.after(2500, lambda: lbl_subtitle.config(text=orig_txt))
+
+        for tree in themed_widgets["treeviews"]:
+            tree.bind("<Double-1>", on_tree_double_click)
+
+        # Productivity Hotkeys
+        for num in range(1, min(9, len(tab_pages) + 1)):
+            root.bind(f"<Control-Key-{num}>", lambda e, idx=num-1: switch_tab(idx))
+
+        root.bind("<F5>", lambda e: do_scan())
+        root.bind("<Control-r>", lambda e: do_scan())
+        root.bind("<Control-R>", lambda e: do_scan())
+
+        def on_hotkey_stress(e):
+            switch_tab(1)
+            if self.stress_engine.is_running:
+                stop_stress()
+            else:
+                start_stress()
+
+        root.bind("<Control-t>", on_hotkey_stress)
+        root.bind("<Control-T>", on_hotkey_stress)
+        root.bind("<Control-s>", lambda e: do_export_html())
+        root.bind("<Control-S>", lambda e: do_export_html())
+        root.bind("<Escape>", lambda e: stop_stress() if self.stress_engine.is_running else None)
 
         # Prime initial instant metrics (<2ms, zero overhead)
         try:

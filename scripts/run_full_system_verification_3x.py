@@ -150,18 +150,26 @@ def test_cli_cycle(cycle_num: int):
     assert res.returncode == 0, f"JSON export failed: {res.stderr}"
     data = json.loads(res.stdout)
     assert "health_score" in data and "system" in data and "cpu" in data
-    print(f"   [C{cycle_num}:CLI] ✓ CLI commands & JSON parser passed cleanly.")
+
+    # Ephemeral Diagnostic Bundle export
+    res = subprocess.run([sys.executable, "-m", "hwscan.cli", "--ephemeral", "--bundle", "test_run_bundle.zip"], capture_output=True, text=True)
+    assert res.returncode == 0, f"Bundle export failed: {res.stderr}"
+    assert "Complete diagnostic bundle archive generated:" in res.stdout
+    if os.path.exists("test_run_bundle.zip"):
+        os.remove("test_run_bundle.zip")
+
+    print(f"   [C{cycle_num}:CLI] ✓ CLI commands, JSON parser, and Ephemeral Bundle passed cleanly.")
 
 
 def test_pytest_cycle(cycle_num: int):
     """Run complete pytest test suite."""
-    print(f"   [C{cycle_num}:PYTEST] Executing full pytest suite (98 tests)...", flush=True)
+    print(f"   [C{cycle_num}:PYTEST] Executing full pytest suite (103 tests)...", flush=True)
     t0 = time.time()
     res = subprocess.run([sys.executable, "-m", "pytest", "-q"], capture_output=True, text=True)
     elapsed = time.time() - t0
     assert res.returncode == 0, f"Pytest failed with exit code {res.returncode}:\n{res.stdout}\n{res.stderr}"
-    assert "98 passed" in res.stdout or "passed" in res.stdout
-    print(f"   [C{cycle_num}:PYTEST] ✓ 98/98 tests passed in {elapsed:.2f}s.", flush=True)
+    assert "103 passed" in res.stdout or "passed" in res.stdout
+    print(f"   [C{cycle_num}:PYTEST] ✓ 103/103 tests passed in {elapsed:.2f}s.", flush=True)
 
 
 def test_binaries_cycle(cycle_num: int):

@@ -76,6 +76,20 @@ def main():
     )
 
     parser.add_argument(
+        "--bundle",
+        nargs="?",
+        const="HardwareGauntlet_Bundle.zip",
+        metavar="FILE",
+        help="Generate comprehensive diagnostic bundle ZIP archive (JSON, HTML, CSV, TXT, ENV)"
+    )
+
+    parser.add_argument(
+        "--ephemeral",
+        action="store_true",
+        help="Run in pure ephemeral in-memory mode without writing configuration or state to disk"
+    )
+
+    parser.add_argument(
         "--web",
         action="store_true",
         help="Launch embedded web dashboard & multi-OS download center"
@@ -127,6 +141,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.ephemeral:
+        from hwscan.core.user_settings import set_ephemeral_mode
+        set_ephemeral_mode(True)
 
     # Update Channel Operations
     if args.check_update or args.channel is not None or args.apply_patch or args.rollback_patch:
@@ -186,7 +204,7 @@ def main():
     if len(sys.argv) == 1 and not args.cli:
         should_launch_gui = True
 
-    if should_launch_gui and not (args.cli or args.json or args.html or args.markdown or args.csv or args.health or args.full):
+    if should_launch_gui and not (args.cli or args.json or args.html or args.markdown or args.csv or args.bundle or args.health or args.full):
         from hwscan.gui import launch_gui
         engine_choice = args.gui if args.gui in ("auto", "webview", "tk") else "auto"
         launch_gui(prefer_engine=engine_choice)
@@ -235,8 +253,15 @@ def main():
             print(f"[✓] CSV report saved to: {args.csv}")
         handled_output = True
 
+    if args.bundle:
+        from hwscan.reporters.bundle import DiagnosticBundleReporter
+        reporter = DiagnosticBundleReporter()
+        bundle_file = reporter.create_bundle(report, output_zip=args.bundle)
+        print(f"[✓] Complete diagnostic bundle archive generated: {bundle_file}")
+        handled_output = True
+
     # Terminal rendering
-    if not handled_output or (args.html and not args.json and not args.csv) or (args.markdown and not args.json and not args.csv) or args.cli or args.full:
+    if not handled_output or (args.html and not args.json and not args.csv and not args.bundle) or (args.markdown and not args.json and not args.csv and not args.bundle) or args.cli or args.full:
         reporter = ConsoleReporter()
         reporter.render(report, full=args.full)
 

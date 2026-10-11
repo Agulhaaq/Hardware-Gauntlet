@@ -73,12 +73,30 @@ class StorageScanner(BaseScanner):
         # First try Get-PhysicalDisk (modern Windows 10/11)
         try:
             raw_json = run_powershell_json(
-                "Get-PhysicalDisk | Select-Object FriendlyName, MediaType, BusType, Size, SerialNumber, HealthStatus"
+                "Get-PhysicalDisk | Select-Object FriendlyName, DeviceId, MediaType, BusType, Size, SerialNumber, HealthStatus"
             )
             if raw_json:
                 data = json.loads(raw_json)
                 if isinstance(data, dict):
                     data = [data]
+
+                # Try to query reliability counters (wear, temperature, power on hours)
+                rel_map = {}
+                try:
+                    rel_json = run_powershell_json(
+                        "Get-PhysicalDisk | ForEach-Object { $d = $_; $r = $d | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue; if ($r) { [PSCustomObject]@{ DeviceId = $d.DeviceId; Wear = $r.Wear; Temperature = $r.Temperature; PowerOnHours = $r.PowerOnHours; ReadErrorsTotal = $r.ReadErrorsTotal } } } | ConvertTo-Json"
+                    )
+                    if rel_json:
+                        rel_data = json.loads(rel_json)
+                        if isinstance(rel_data, dict):
+                            rel_data = [rel_data]
+                        for r_item in rel_data:
+                            dev_id = str(r_item.get("DeviceId", "")).strip()
+                            if dev_id:
+                                rel_map[dev_id] = r_item
+                except Exception:
+                    pass
+
                 for item in data:
                     disk = PhysicalDisk()
                     disk.model = item.get("FriendlyName", "Unknown Drive").strip()
@@ -90,6 +108,20 @@ class StorageScanner(BaseScanner):
                     if sz:
                         disk.size_bytes = int(sz)
                         disk.size_formatted = format_bytes(disk.size_bytes)
+
+                    dev_id = str(item.get("DeviceId", "")).strip()
+                    if dev_id in rel_map:
+                        r = rel_map[dev_id]
+                        w = r.get("Wear")
+                        if w is not None and isinstance(w, (int, float)):
+                            disk.wear_percent = float(w)
+                        temp = r.get("Temperature")
+                        if temp is not None and isinstance(temp, (int, float)) and 0 < temp < 120:
+                            disk.temperature_c = float(temp)
+                        poh = r.get("PowerOnHours")
+                        if poh is not None and isinstance(poh, (int, float)):
+                            disk.power_on_hours = int(poh)
+
                     info.physical_disks.append(disk)
                 if info.physical_disks:
                     return
