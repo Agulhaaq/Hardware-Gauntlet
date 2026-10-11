@@ -23,7 +23,7 @@ def build():
     machine = platform.machine().lower()
 
     if current_os == "windows":
-        bin_name = "hwscan-windows-x64.exe" if "64" in machine else "hwscan-windows-x86.exe"
+        bin_name = "HardwareGauntlet.exe"
     elif current_os == "darwin":
         bin_name = "hwscan-macos-universal"
     else:
@@ -70,6 +70,10 @@ def build():
         if os.path.exists(target_file):
             os.remove(target_file)
         os.rename(built_file, target_file)
+
+    if current_os == "windows":
+        root_exe = os.path.join(os.getcwd(), "HardwareGauntlet.exe")
+        shutil.copy2(target_file, root_exe)
 
     print("=" * 60)
     print(f"[✓] BUILD SUCCESSFUL! Compiled binary saved at:")

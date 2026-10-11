@@ -203,12 +203,15 @@ Hardware-Gauntlet/
 │   ├── install.sh            # 1-liner portable Unix runner (zero install)
 │   └── download_page.html    # Standalone static download landing page
 ├── scripts/
-│   ├── build_branding_assets.py # Multi-resolution brand asset generator
-│   └── capture_current_ui.py    # Automated headless UI capture harness
-├── tests/                    # 91 comprehensive automated pytest tests
-├── .github/
-│   └── workflows/
-│       └── build-and-release.yml # Multi-OS CI/CD build matrix
+│   ├── build_branding_assets.py      # Multi-resolution brand asset generator
+│   ├── capture_current_ui.py         # Automated headless UI capture harness
+│   ├── push_update.py                # Hot-patch builder & update channel release script
+│   ├── verify_ui_stability.py        # 3-cycle automated live UI stability verification
+│   ├── verify_single_instance_3x.py  # 3-cycle single-instance mutex verification harness
+│   └── run_full_system_verification_3x.py # 3-cycle full-spectrum system verification runner
+├── tests/                            # 92 comprehensive automated pytest tests
+├── distribution/workflows/
+│   └── build-and-release.yml         # Multi-OS CI/CD build matrix and GitHub Releases template
 ├── HardwareGauntlet.spec     # Windows PyInstaller UPX spec
 ├── build.py                  # Standalone PyInstaller compiler script
 ├── pyproject.toml            # PEP 518/621 build configuration
