@@ -40,7 +40,7 @@ def run_stability_test_cycle(cycle_num: int):
                     # 2. Find interactive controls
                     theme_btn = None
                     scan_btn = None
-                    update_btn = None
+                    bundle_btn = None
                     trim_btn = None
                     retrim_btn = None
                     purge_btn = None
@@ -59,8 +59,8 @@ def run_stability_test_cycle(cycle_num: int):
                                         scan_btn = btn
                                     elif "LIGHT" in txt or "DARK" in txt:
                                         theme_btn = btn
-                                    elif "UPDATE" in txt and not update_btn:
-                                        update_btn = btn
+                                    elif "BUNDLE" in txt and not bundle_btn:
+                                        bundle_btn = btn
                                     elif "TRIM RAM" in txt:
                                         trim_btn = btn
                                     elif "RETRIM" in txt:
@@ -74,7 +74,7 @@ def run_stability_test_cycle(cycle_num: int):
                     assert len(tab_buttons) >= 8, f"Expected 8 tab buttons, found {len(tab_buttons)}"
                     assert scan_btn is not None, "Scan button not found"
                     assert theme_btn is not None, "Theme toggle button not found"
-                    assert update_btn is not None, "Update channel button not found"
+                    assert bundle_btn is not None, "Bundle export button not found"
 
                     # 3. Cycle through all 8 tabs
                     print(f" [Cycle {cycle_num}] 3. Exercising all 8 tabs navigation:")
@@ -98,19 +98,6 @@ def run_stability_test_cycle(cycle_num: int):
                     root_win.update()
                     assert gui.current_theme == "dark", "Failed returning to dark theme"
                     print("    -> Reverted cleanly to DARK MODE")
-
-                    # 5. Test Update Channel Modal
-                    print(f" [Cycle {cycle_num}] 5. Testing Update Channel Modal:")
-                    update_btn.command()
-                    root_win.update()
-                    top_wins = [w for w in root_win.winfo_children() if isinstance(w, tk.Toplevel)]
-                    assert len(top_wins) >= 1, "Failed opening update modal"
-                    modal = top_wins[0]
-                    modal.update()
-                    print(f"    -> Modal opened: '{modal.title()}'")
-                    modal.destroy()
-                    root_win.update()
-                    print("    -> Modal closed cleanly")
 
                     # 6. Test on-demand hardware scan execution
                     print(f" [Cycle {cycle_num}] 6. Running full hardware scan...", flush=True)

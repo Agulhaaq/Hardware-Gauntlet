@@ -39,7 +39,7 @@ def test_ui_cycle(cycle_num: int):
 
                     theme_btn = None
                     scan_btn = None
-                    update_btn = None
+                    bundle_btn = None
                     trim_btn = None
                     tab_buttons = []
 
@@ -56,8 +56,8 @@ def test_ui_cycle(cycle_num: int):
                                         scan_btn = btn
                                     elif "LIGHT" in txt or "DARK" in txt:
                                         theme_btn = btn
-                                    elif "UPDATE" in txt and not update_btn:
-                                        update_btn = btn
+                                    elif "BUNDLE" in txt and not bundle_btn:
+                                        bundle_btn = btn
                                     elif "TRIM RAM" in txt:
                                         trim_btn = btn
                                     elif any(k in txt for k in ["OVERVIEW", "STRESS", "CPU", "MEMORY", "GRAPHICS", "STORAGE", "SECURITY", "UTILITIES"]):
@@ -66,7 +66,7 @@ def test_ui_cycle(cycle_num: int):
                     assert len(tab_buttons) >= 8, f"Expected 8 tab buttons, found {len(tab_buttons)}"
                     assert scan_btn is not None, "Scan button not found"
                     assert theme_btn is not None, "Theme toggle not found"
-                    assert update_btn is not None, "Update button not found"
+                    assert bundle_btn is not None, "Bundle button not found"
 
                     # 1. Exercise all 8 tabs
                     for tab in tab_buttons[:8]:
@@ -84,14 +84,6 @@ def test_ui_cycle(cycle_num: int):
                     theme_btn.command()
                     root_win.update()
                     assert gui.current_theme == "dark"
-
-                    # 3. Open and close update channel modal
-                    update_btn.command()
-                    root_win.update()
-                    top_wins = [w for w in root_win.winfo_children() if isinstance(w, tk.Toplevel)]
-                    assert len(top_wins) >= 1, "Failed to open modal"
-                    top_wins[0].destroy()
-                    root_win.update()
 
                     # 4. Trigger scan
                     scan_done = threading.Event()

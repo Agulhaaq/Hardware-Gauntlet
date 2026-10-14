@@ -74,7 +74,6 @@ def run_captures():
             def execute_and_capture():
                 theme_btn = None
                 scan_btn = None
-                channel_btn = None
 
                 for child in root_win.winfo_children():
                     for sub in child.winfo_children():
@@ -85,8 +84,6 @@ def run_captures():
                                     scan_btn = btn
                                 if "LIGHT" in txt or "DARK" in txt:
                                     theme_btn = btn
-                                if "UPDATE" in txt:
-                                    channel_btn = btn
 
                 # Trigger real hardware scan synchronously
                 report = gui.engine.run_full_scan()
@@ -113,25 +110,6 @@ def run_captures():
                             # Switch back to Dark Mode
                             theme_btn.command()
                             root_win.update()
-
-                        # Open Update Channel Modal
-                        if channel_btn and channel_btn.command:
-                            channel_btn.command()
-                            root_win.update_idletasks()
-                            root_win.update()
-                            top_wins = [w for w in root_win.winfo_children() if isinstance(w, tk.Toplevel)]
-                            if top_wins:
-                                top_win = top_wins[0]
-                                def finish_modal():
-                                    top_win.update_idletasks()
-                                    top_win.update()
-                                    out_modal = os.path.join(REPO_ROOT, "current_ui_update_modal.png")
-                                    capture_widget(top_win, out_modal)
-                                    print(f"Captured: {out_modal}")
-                                    top_win.destroy()
-                                    root_win.destroy()
-                                root_win.after(200, finish_modal)
-                                return
 
                         root_win.destroy()
                     else:
