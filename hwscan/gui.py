@@ -122,7 +122,7 @@ THEMES = {
         "tab_sel_fg": "#08080a",
         "capsule_bg": "#121217",
         "capsule_border": "#252532",
-        "toggle_text": "☀️ LIGHT MODE",
+        "toggle_text": "☀️ LIGHT",
         "logo_file": "logo_white_48.png",
         "logo_fallback": "logo_white.png",
     },
@@ -169,7 +169,7 @@ THEMES = {
         "tab_fg": "#64748b",
         "tab_sel_bg": "#09090b",
         "tab_sel_fg": "#ffffff",
-        "toggle_text": "🌙 DARK MODE",
+        "toggle_text": "🌙 DARK",
         "logo_file": "logo_black_48.png",
         "logo_fallback": "logo_black.png",
     }
@@ -254,7 +254,7 @@ def get_asset_file_path(filename: str) -> str:
     return os.path.join(repo_root, "assets", filename)
 
 
-def create_smooth_pill_img(w: int, h: int, fill_color: str, border_color: Optional[str] = None, scale: int = 2) -> Image.Image:
+def create_smooth_pill_img(w: int, h: int, fill_color: str, border_color: Optional[str] = None, scale: int = 3) -> Image.Image:
     """Render a pixel-perfect, anti-aliased pill capsule with Lanczos downsampling."""
     ws = w * scale
     hs = h * scale
@@ -328,6 +328,8 @@ class PillButton(tk.Canvas):
         self.text = new_text
         if self._text_id:
             self.itemconfig(self._text_id, text=new_text)
+        else:
+            self.draw()
 
     def set_state(self, state: str):
         self.state = state
@@ -360,7 +362,9 @@ class PillButton(tk.Canvas):
             t_col = self.text_color
 
         self._bg_img_id = self.create_image(0, 0, anchor="nw", image=img)
-        self._text_id = self.create_text(self.w / 2.0, self.h / 2.0, text=self.text, fill=t_col, font=self.btn_font)
+        cx = int(round(self.w / 2.0))
+        cy = int(round(self.h / 2.0))
+        self._text_id = self.create_text(cx, cy, text=self.text, fill=t_col, font=self.btn_font)
 
 
 class RadialDialWidget(tk.Canvas):
@@ -458,8 +462,8 @@ class RadialDialWidget(tk.Canvas):
 
         # 2. Update Canvas image and text objects
         self.delete("all")
-        cx = self.size / 2.0
-        cy = self.size / 2.0
+        cx = int(round(self.size / 2.0))
+        cy = int(round(self.size / 2.0))
 
         if self._current_photo:
             self.create_image(0, 0, anchor="nw", image=self._current_photo)
@@ -467,8 +471,8 @@ class RadialDialWidget(tk.Canvas):
         display_val = f"{self.value_str}{self.unit}"
         val_font_size = 20 if len(display_val) <= 4 else 15
         self.create_text(cx, cy - 8, text=display_val, fill=self.text_color, font=("Segoe UI", val_font_size, "bold"))
-        self.create_text(cx, cy + 16, text=self.sub_str.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
-        self.create_text(cx, self.size - 22, text=self.title_text.upper(), fill=self.dim_color, font=("Segoe UI", 7, "bold"))
+        self.create_text(cx, cy + 16, text=self.sub_str.upper(), fill=self.dim_color, font=("Segoe UI", 8, "bold"))
+        self.create_text(cx, self.size - 20, text=self.title_text.upper(), fill=self.dim_color, font=("Segoe UI", 8, "bold"))
 
 
 class PillToggle(tk.Canvas):
@@ -584,8 +588,18 @@ class TelemetryWaveCanvas(tk.Canvas):
         self.phase = 0.0
         self.wave_color = "#ffffff"
         self.bg_color = "#15151a"
+        self._after_id = None
         self.line_id = self.create_line([0, height / 2.0, width, height / 2.0], fill=self.wave_color, width=2, smooth=True)
+        self.bind("<Destroy>", self._on_destroy)
         self._animate()
+
+    def _on_destroy(self, event=None):
+        if self._after_id:
+            try:
+                self.after_cancel(self._after_id)
+            except Exception:
+                pass
+            self._after_id = None
 
     def set_theme(self, bg: str, wave_color: str):
         self.bg_color = bg
@@ -594,36 +608,40 @@ class TelemetryWaveCanvas(tk.Canvas):
         self.itemconfig(self.line_id, fill=wave_color)
 
     def _animate(self):
-        if not self.winfo_exists():
+        try:
+            if not self.winfo_exists():
+                return
+            self.phase += 0.065
+            mid_y = int(round(self.h / 2.0))
+            amp1 = 10.0
+            amp2 = 4.5
+
+            pts = []
+            for x in range(6, self.w - 6, 4):
+                y = mid_y + amp1 * math.sin((x * 0.036) + self.phase) + amp2 * math.cos((x * 0.082) - self.phase * 0.4)
+                pts.extend([x, y])
+
+            if len(pts) >= 4:
+                self.coords(self.line_id, *pts)
+
+            self._after_id = self.after(33, self._animate)  # Smooth 30 FPS tear-free
+        except Exception:
             return
-        self.phase += 0.065
-        mid_y = self.h / 2.0
-        amp1 = 12.0
-        amp2 = 5.5
-
-        pts = []
-        for x in range(6, self.w - 6, 4):
-            y = mid_y + amp1 * math.sin((x * 0.036) + self.phase) + amp2 * math.cos((x * 0.082) - self.phase * 0.4)
-            pts.extend([x, y])
-
-        if len(pts) >= 4:
-            self.coords(self.line_id, *pts)
-
-        self.after(33, self._animate)  # Smooth 30 FPS tear-free
 
 
 class BentoSparklineCanvas(tk.Canvas):
     """Dynamic multi-segment bar sparkline for Bento-Box Studio hero cards."""
 
-    def __init__(self, parent, width=320, height=54, bar_count=18, **kwargs):
+    def __init__(self, parent, width=380, height=52, bar_count=20, **kwargs):
         super().__init__(parent, width=width, height=height, highlightthickness=0, bd=0, **kwargs)
         self.w = width
         self.h = height
         self.bar_count = bar_count
-        self.values = [0.35, 0.42, 0.38, 0.55, 0.48, 0.62, 0.58, 0.72, 0.65, 0.80, 0.75, 0.68, 0.74, 0.82, 0.78, 0.85, 0.82, 0.88]
+        self.values = [0.30, 0.36, 0.32, 0.44, 0.40, 0.50, 0.46, 0.56, 0.52, 0.62, 0.58, 0.52, 0.60, 0.68, 0.64, 0.72, 0.66, 0.75, 0.70, 0.78]
         self.bg_color = "#15151a"
-        self.bar_color = "#3b82f6"
-        self.bar_highlight = "#60a5fa"
+        self.bar_color = "#27272e"
+        self.bar_mid = "#71717a"
+        self.bar_highlight = "#ffffff"
         self.bind("<Configure>", self._on_resize)
         self.draw()
 
@@ -633,16 +651,17 @@ class BentoSparklineCanvas(tk.Canvas):
             self.h = event.height
             self.draw()
 
-    def set_theme(self, bg: str, bar_color: str, bar_highlight: str):
+    def set_theme(self, bg: str, bar_color: str, bar_highlight: str, bar_mid: Optional[str] = None):
         self.bg_color = bg
         self.bar_color = bar_color
         self.bar_highlight = bar_highlight
+        self.bar_mid = bar_mid if bar_mid is not None else bar_color
         self.configure(bg=bg)
         self.draw()
 
     def update_history(self, new_val: float):
         """Append normalized 0.0-1.0 value and redraw sparkline."""
-        clamped = max(0.1, min(1.0, float(new_val)))
+        clamped = max(0.12, min(1.0, float(new_val)))
         self.values.append(clamped)
         if len(self.values) > self.bar_count:
             self.values.pop(0)
@@ -656,18 +675,24 @@ class BentoSparklineCanvas(tk.Canvas):
 
         spacing = 4
         total_spacing = spacing * (n - 1)
-        avail_w = max(10, self.w - 12 - total_spacing)
+        avail_w = max(10, self.w - 16 - total_spacing)
         bar_w = max(3.0, avail_w / float(n))
 
-        x_start = 6.0
+        x_start = 8.0
         for i, val in enumerate(self.values):
-            x1 = x_start + i * (bar_w + spacing)
-            x2 = x1 + bar_w
-            bar_h = max(4.0, (self.h - 10) * val)
-            y1 = self.h - 5 - bar_h
-            y2 = self.h - 5
+            x1 = int(round(x_start + i * (bar_w + spacing)))
+            x2 = int(round(x1 + bar_w))
+            bar_h = max(4.0, (self.h - 12) * val)
+            y1 = int(round(self.h - 6 - bar_h))
+            y2 = int(round(self.h - 6))
 
-            color = self.bar_highlight if i >= n - 3 else self.bar_color
+            if i >= n - 2:
+                color = self.bar_highlight
+            elif i >= n - 5:
+                color = self.bar_mid
+            else:
+                color = self.bar_color
+
             self.create_rectangle(x1, y1, x2, y2, fill=color, outline="", width=0)
 
 
@@ -809,18 +834,19 @@ class BubbleCapsuleStrip(tk.Canvas):
         if self._bg_img:
             self.create_image(0, 0, anchor="nw", image=self._bg_img)
 
-        self.create_text(28, self.h / 2.0, text=self.icon, font=("Segoe UI Emoji", 13), anchor="center")
+        mid_y = int(round(self.h / 2.0))
+        self.create_text(28, mid_y, text=self.icon, font=("Segoe UI Emoji", 13), anchor="center")
 
         status_text = "ACTIVE" if self.is_on else "STANDBY"
-        self.create_text(54, self.h / 2.0 - 9, text=self.title.upper(), fill=self.text_color, font=("Segoe UI", 9, "bold"), anchor="w")
-        self.create_text(54, self.h / 2.0 + 9, text=f"{status_text} • {self.desc}", fill=self.dim_color, font=("Segoe UI", 7), anchor="w")
+        self.create_text(54, mid_y - 9, text=self.title.upper(), fill=self.text_color, font=("Segoe UI", 9, "bold"), anchor="w")
+        self.create_text(54, mid_y + 9, text=f"{status_text} • {self.desc}", fill=self.dim_color, font=("Segoe UI", 8), anchor="w")
 
         track_img = self._track_on_img if self.is_on else self._track_off_img
         knob_img = self._knob_on_img if self.is_on else self._knob_off_img
         if track_img:
-            self.create_image(self.track_x, self.track_y, anchor="nw", image=track_img)
+            self.create_image(int(round(self.track_x)), int(round(self.track_y)), anchor="nw", image=track_img)
         if knob_img:
-            self.create_image(int(round(self._current_knob_x)), self.track_y + 3, anchor="nw", image=knob_img)
+            self.create_image(int(round(self._current_knob_x)), int(round(self.track_y + 3)), anchor="nw", image=knob_img)
 
 
 def enable_high_dpi_awareness() -> None:
@@ -869,6 +895,18 @@ class HardwareGauntletGUI:
         enable_high_dpi_awareness()
         root = tk.Tk()
         root.title(WINDOW_TITLE)
+
+        # Calibrate Tk font scaling to native Windows monitor DPI for razor-sharp rendering
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                hdc = ctypes.windll.user32.GetDC(0)
+                dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX = 88
+                ctypes.windll.user32.ReleaseDC(0, hdc)
+                if dpi and dpi > 0:
+                    root.tk.call('tk', 'scaling', float(dpi) / 72.0)
+            except Exception:
+                pass
 
         saved_geom = get_setting("window_geometry", "1180x820")
         if not isinstance(saved_geom, str) or "x" not in saved_geom:
@@ -1043,7 +1081,7 @@ class HardwareGauntletGUI:
         btn_scan.pack(side=tk.LEFT, padx=3)
         themed_widgets["pill_buttons"].append(btn_scan)
 
-        btn_theme = PillButton(btn_frame, text="☀️ LIGHT", command=toggle_theme, width=96, height=32, is_primary=False)
+        btn_theme = PillButton(btn_frame, text="☀️ LIGHT", command=toggle_theme, width=102, height=32, is_primary=False)
         btn_theme.pack(side=tk.LEFT, padx=3)
         themed_widgets["pill_buttons"].append(btn_theme)
 
@@ -1198,9 +1236,10 @@ class HardwareGauntletGUI:
         themed_widgets["cards"].append(lbl_hero_temp)
         themed_widgets["text_primary"].append(lbl_hero_temp)
 
-        lbl_hero_unit = tk.Label(hero_val_row, text="°C", font=("Segoe UI", 16, "bold"), fg="#3b82f6")
+        lbl_hero_unit = tk.Label(hero_val_row, text="°C", font=("Segoe UI", 16, "bold"))
         lbl_hero_unit.pack(side=tk.LEFT, padx=(2, 0), pady=(8, 0))
         themed_widgets["cards"].append(lbl_hero_unit)
+        themed_widgets["text_dim"].append(lbl_hero_unit)
 
         lbl_hero_clock = tk.Label(hero_text_col, text="CPU Package Temp • 4.80 GHz Boost", font=("Segoe UI", 8))
         lbl_hero_clock.pack(anchor="w", pady=(0, 4))
@@ -1272,10 +1311,13 @@ class HardwareGauntletGUI:
         themed_widgets["cards"].append(lbl_tmem_val)
         themed_widgets["text_primary"].append(lbl_tmem_val)
 
-        # Horizontal capacity bar
-        mem_bar_bg = tk.Frame(tile_mem, height=6, bg="#2a2a34")
-        mem_bar_bg.pack(fill=tk.X, pady=(3, 8))
-        mem_bar_fill = tk.Frame(mem_bar_bg, height=6, width=65, bg="#6366f1")
+        # Horizontal capacity bar with crisp duotone styling
+        mem_bar_bg = tk.Frame(tile_mem, height=7, highlightthickness=1)
+        mem_bar_bg.pack(fill=tk.X, pady=(4, 9))
+        themed_widgets["card_alts"].append(mem_bar_bg)
+        themed_widgets["borders"].append(mem_bar_bg)
+
+        mem_bar_fill = tk.Frame(mem_bar_bg, height=5, width=65)
         mem_bar_fill.place(x=0, y=0, relheight=1.0, relwidth=0.26)
 
         def do_trim_ram():
@@ -1371,6 +1413,11 @@ class HardwareGauntletGUI:
         themed_widgets["cards"].append(lbl_purge_sub)
         themed_widgets["text_dim"].append(lbl_purge_sub)
 
+        # Dynamic telemetry wave spline bridging storage text and purge action
+        banner_wave = TelemetryWaveCanvas(tile_purge_banner, width=160, height=36)
+        banner_wave.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=14)
+        themed_widgets["waves"].append(banner_wave)
+
         btn_purge_action = PillButton(
             tile_purge_banner,
             text="PURGE 2.4 GB",
@@ -1382,13 +1429,31 @@ class HardwareGauntletGUI:
         btn_purge_action.pack(side=tk.RIGHT)
         themed_widgets["pill_buttons"].append(btn_purge_action)
 
-        # Bottom Findings Treeview
-        lbl_findings_hdr = tk.Label(tab_overview, text="HARDWARE AUDIT FINDINGS & ALERTS —", font=("Segoe UI", 10, "bold"))
-        lbl_findings_hdr.pack(anchor="w", pady=(4, 6))
-        themed_widgets["root_bg"].append(lbl_findings_hdr)
+        # Findings Box (Styled Bento Card matching dashboard containers)
+        findings_card = tk.Frame(tab_overview, padx=18, pady=12, highlightthickness=1)
+        findings_card.pack(fill=tk.BOTH, expand=True)
+        themed_widgets["cards"].append(findings_card)
+        themed_widgets["borders"].append(findings_card)
+
+        findings_hdr_row = tk.Frame(findings_card)
+        findings_hdr_row.pack(fill=tk.X, pady=(0, 8))
+        themed_widgets["cards"].append(findings_hdr_row)
+
+        lbl_findings_hdr = tk.Label(findings_hdr_row, text="HARDWARE AUDIT FINDINGS & ALERTS —", font=("Segoe UI", 9, "bold"))
+        lbl_findings_hdr.pack(side=tk.LEFT)
+        themed_widgets["cards"].append(lbl_findings_hdr)
         themed_widgets["text_primary"].append(lbl_findings_hdr)
 
-        tree_warn = ttk.Treeview(tab_overview, columns=("level", "category", "details"), show="headings", height=8)
+        lbl_findings_badge = tk.Label(findings_hdr_row, text="● OPTIMAL (0 NOTICES)", font=("Segoe UI", 8, "bold"), fg="#10b981", bg="#15151a")
+        lbl_findings_badge.pack(side=tk.LEFT, padx=(10, 0))
+        themed_widgets["cards"].append(lbl_findings_badge)
+
+        lbl_findings_hint = tk.Label(findings_hdr_row, text="Double-click any entry to copy diagnostic trace", font=("Segoe UI", 8))
+        lbl_findings_hint.pack(side=tk.RIGHT)
+        themed_widgets["cards"].append(lbl_findings_hint)
+        themed_widgets["text_muted"].append(lbl_findings_hint)
+
+        tree_warn = ttk.Treeview(findings_card, columns=("level", "category", "details"), show="headings", height=6)
         tree_warn.heading("level", text="Severity")
         tree_warn.heading("category", text="Category")
         tree_warn.heading("details", text="Observation & Recommendation")
@@ -2215,11 +2280,20 @@ class HardwareGauntletGUI:
             for spark, container_key in themed_widgets.get("sparklines", []):
                 try:
                     parent_bg = th[container_key] if container_key in th else th["card"]
-                    spark.set_theme(
-                        bg=parent_bg,
-                        bar_color="#3b82f6" if self.current_theme == "dark" else "#2563eb",
-                        bar_highlight="#60a5fa" if self.current_theme == "dark" else "#3b82f6"
-                    )
+                    if self.current_theme == "dark":
+                        spark.set_theme(
+                            bg=parent_bg,
+                            bar_color="#27272e",
+                            bar_highlight="#ffffff",
+                            bar_mid="#71717a"
+                        )
+                    else:
+                        spark.set_theme(
+                            bg=parent_bg,
+                            bar_color="#e2e8f0",
+                            bar_highlight="#09090b",
+                            bar_mid="#94a3b8"
+                        )
                 except Exception:
                     pass
 
@@ -2254,6 +2328,13 @@ class HardwareGauntletGUI:
                 except Exception:
                     pass
 
+            # Update memory progress bar to match theme
+            try:
+                mem_bar_bg.config(bg=th["card_alt"], highlightbackground=th["border"], highlightcolor=th["border"])
+                mem_bar_fill.config(bg=th["accent"])
+            except Exception:
+                pass
+
             btn_theme.set_text(th["toggle_text"])
 
             logo_img = get_theme_logo(self.current_theme)
@@ -2261,7 +2342,7 @@ class HardwareGauntletGUI:
                 lbl_logo.config(image=logo_img)
                 lbl_logo.image = logo_img
 
-            # TTK Styles for Treeviews and Notebook
+            # TTK Styles for Treeviews, Progressbars, Comboboxes and Notebook
             style.configure("TNotebook", background=th["bg"], borderwidth=0)
             style.configure(
                 "TNotebook.Tab",
@@ -2277,6 +2358,23 @@ class HardwareGauntletGUI:
                 "TNotebook.Tab",
                 background=[("selected", th["tab_sel_bg"])],
                 foreground=[("selected", th["tab_sel_fg"])]
+            )
+
+            style.configure(
+                "Horizontal.TProgressbar",
+                troughcolor=th["card_alt"],
+                background=th["accent"],
+                bordercolor=th["border"],
+                lightcolor=th["accent"],
+                darkcolor=th["accent"]
+            )
+            style.configure(
+                "TCombobox",
+                fieldbackground=th["card"],
+                background=th["card_alt"],
+                foreground=th["text"],
+                arrowcolor=th["text"],
+                bordercolor=th["border"]
             )
 
             style.configure(
@@ -2371,8 +2469,17 @@ class HardwareGauntletGUI:
             if report.warnings:
                 for w in report.warnings:
                     warn_rows.append((w.level, w.category, f"{w.title}: {w.description}"))
+                w_cnt = len(report.warnings)
+                lbl_findings_badge.config(
+                    text=f"● {w_cnt} NOTICE{'S' if w_cnt > 1 else ''}",
+                    fg="#f59e0b"
+                )
             else:
                 warn_rows.append(("HEALTHY", "System", "All hardware components operating with optimal parameters."))
+                lbl_findings_badge.config(
+                    text="● OPTIMAL (0 NOTICES)",
+                    fg="#10b981"
+                )
             populate_tree(tree_warn, warn_rows)
 
             # CPU & Motherboard
