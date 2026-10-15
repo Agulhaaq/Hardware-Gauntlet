@@ -133,7 +133,8 @@ def audit_startup_applications(log_fn: Optional[Callable[[str], None]] = None) -
         "items": items,
         "total_items": len(items),
         "high_impact_count": len(high_impact),
-        "recommendation": "Disable non-essential High-Impact apps in Task Manager > Startup Apps to shave seconds off boot time."
+        "recommendation": "Disable non-essential High-Impact apps in Task Manager > Startup Apps to shave seconds off boot time.",
+        "success": True
     }
 
 
@@ -176,7 +177,8 @@ def audit_background_services(log_fn: Optional[Callable[[str], None]] = None) ->
     return {
         "total_services_analyzed": total_services,
         "telemetry_services_flagged": flagged_services,
-        "recommendations": recs
+        "recommendations": recs,
+        "success": True
     }
 
 
@@ -226,7 +228,8 @@ def audit_power_and_latency_profiles(log_fn: Optional[Callable[[str], None]] = N
     return {
         "active_scheme": active_scheme,
         "power_state_status": power_state_status,
-        "recommendations": recs
+        "recommendations": recs,
+        "success": True
     }
 
 
@@ -252,5 +255,6 @@ def run_startup_optimization_suite(log_fn: Optional[Callable[[str], None]] = Non
     return {
         "startup": startup,
         "services": services,
-        "power": power
+        "power": power,
+        "success": True
     }

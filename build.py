@@ -73,7 +73,12 @@ def build():
 
     if current_os == "windows":
         root_exe = os.path.join(os.getcwd(), "HardwareGauntlet.exe")
-        shutil.copy2(target_file, root_exe)
+        try:
+            shutil.copy2(target_file, root_exe)
+        except PermissionError:
+            import time
+            time.sleep(1.5)
+            shutil.copy2(target_file, root_exe)
 
     print("=" * 60)
     print(f"[✓] BUILD SUCCESSFUL! Compiled binary saved at:")

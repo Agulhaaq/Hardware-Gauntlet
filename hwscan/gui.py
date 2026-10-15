@@ -1941,7 +1941,7 @@ class HardwareGauntletGUI:
                         res = target_fn(log_fn=logger)
                     else:
                         res = target_fn()
-                    if isinstance(res, dict) and res.get("success"):
+                    if res is None or (isinstance(res, dict) and res.get("success", True)):
                         root.after(0, lambda: log_clean(f"✓ {action_name} executed successfully."))
                 except Exception as ex:
                     root.after(0, lambda: log_clean(f"Execution error: {ex}"))

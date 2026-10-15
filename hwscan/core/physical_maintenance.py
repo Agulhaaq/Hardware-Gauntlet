@@ -102,7 +102,8 @@ def get_fan_and_heatsink_cleaning_protocol(chassis_type: str = "auto") -> Dict[s
         "chassis": chassis_type,
         "tools_required": tools,
         "warnings": warnings,
-        "steps": steps
+        "steps": steps,
+        "success": True
     }
 
 
@@ -146,7 +147,8 @@ def get_thermal_repasting_advisor(cpu_temp: Optional[float] = None) -> Dict[str,
         "recommended_compounds": compounds,
         "application_technique": application,
         "warnings": warnings,
-        "interval_years": "2 to 3 years for conventional paste, 5+ years for PTM7950 phase-change pads"
+        "interval_years": "2 to 3 years for conventional paste, 5+ years for PTM7950 phase-change pads",
+        "success": True
     }
 
 
@@ -170,7 +172,8 @@ def get_peripherals_and_ports_hygiene_guide() -> Dict[str, Any]:
             "Bleach / Chlorine agents",
             "Ammonia / Window Cleaner",
             "Abrasive melamine sponges (Magic Erasers) on glossy or matte finishes"
-        ]
+        ],
+        "success": True
     }
 
 
@@ -203,7 +206,8 @@ def generate_physical_maintenance_guide(log_fn: Optional[Callable[[str], None]] 
         "checklist": checklist,
         "fan_protocol": fan_protocol,
         "tim_advisor": tim_advisor,
-        "peripherals_guide": peripherals
+        "peripherals_guide": peripherals,
+        "success": True
     }
 
 
@@ -245,5 +249,6 @@ def run_physical_maintenance_suite(log_fn: Optional[Callable[[str], None]] = Non
         "form_factor": form_factor,
         "cleaning_protocol": protocol,
         "repasting_advisor": tim,
-        "peripherals_guide": peripherals
+        "peripherals_guide": peripherals,
+        "success": True
     }
